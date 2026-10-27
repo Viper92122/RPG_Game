@@ -1,0 +1,9 @@
+{
+  "village_elder_intro": {
+    "speaker": "Elder Thomas",
+    "textLines": [
+      "Welcome to the valley, traveler.",
+      "The winds carry a dark echo..."
+    ]
+  }
+}

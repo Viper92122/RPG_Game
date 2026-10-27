@@ -1,0 +1,20 @@
+
+game_assets.png
+size: 512, 128
+format: RGBA8888
+filter: Nearest, Nearest
+repeat: none
+healthPotion
+  rotate: false
+  xy: 2, 83
+  size: 288, 39
+  orig: 288, 39
+  offset: 0, 0
+  index: -1
+walking_animations
+  rotate: false
+  xy: 292, 2
+  size: 96, 120
+  orig: 96, 120
+  offset: 0, 0
+  index: -1
