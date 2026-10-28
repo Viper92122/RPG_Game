@@ -20,14 +20,18 @@ import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.ObjectMap;
 
+import io.github.echoesofnebula.ai.AIBehavior;
 import io.github.echoesofnebula.ai.EnemyBrain;
 import io.github.echoesofnebula.entities.Enemy;
 import io.github.echoesofnebula.entities.Entity;
 import io.github.echoesofnebula.core.UpdateAble;
 import io.github.echoesofnebula.entities.Player;
+import io.github.echoesofnebula.entities.Stats;
 import io.github.echoesofnebula.environment.SolidObstacle;
 import io.github.echoesofnebula.events.CollisionEventData;
+import io.github.echoesofnebula.items.LootTable;
 import io.github.echoesofnebula.items.MapEntityFactory;
+import io.github.echoesofnebula.managers.EnemyFactory;
 import io.github.echoesofnebula.managers.ItemEffectRegistry;
 import io.github.echoesofnebula.items.ItemEffect;
 import io.github.echoesofnebula.items.ConsumableItem;
@@ -42,40 +46,27 @@ public class GameWorld {
     private Array<Entity> physicsEntities;
     private Vector2 mapDimensions;
 
-    // TODO: Temporarily stored here
+    private final AssetHub assetHub;
+    private final ItemFactory itemFactory;
+    private final EnemyFactory enemyFactory;
     private static final float FALLBACK_OFFSET_METERS = 10f;
     private final Array<Entity> entitiesToRemove = new Array<>();
     private final ObjectMap<Rectangle, PortalData> portals = new ObjectMap<>();
     private PortalData pendingTransition = null;
     private PortalData activePortalUnderPlayer = null;
     private Player player;
-    private final ItemFactory itemFactory;
     public GameWorld(String initialMapPath, AssetHub assetHub) {
+        this.assetHub = assetHub;
         itemFactory = new ItemFactory(assetHub);
-        init(initialMapPath, assetHub
-        );
+        enemyFactory = new EnemyFactory(assetHub);
+        init(initialMapPath);
     }
 
-    public void spawnItemByName(String itemName, float worldX, float worldY) {
-        System.out.println("🔍 Attempting to spawn item: '" + itemName + "' at (" + worldX + ", " + worldY + ")");
-
-        Item item = itemFactory.createItem(itemName, worldX, worldY);
-
-        if (item == null) {
-            System.err.println("❌ ERROR: ItemFactory returned null for '" + itemName + "'!");
-            return;
-        }
-
-        System.out.println("✅ Item created: " + item.getItemName());
-        System.out.println("   Position: (" + item.getPosition().x + ", " + item.getPosition().y + ")");
-        System.out.println("   Bounds: (" + item.getBounds().x + ", " + item.getBounds().y +
-            ", " + item.getBounds().width + ", " + item.getBounds().height + ")");
-
-        this.addDynamicEntity(item);
-
-        System.out.println("✨ Successfully added to world. Total entities: " + physicsEntities.size);
+    public void spawnItemByName(String itemName, float x, float y) {
+        Item item = itemFactory.createItem(itemName, x, y);
+        if (item != null) this.addDynamicEntity(item);
     }
-    private void init(String initialMapPath, AssetHub assetHub) {
+    private void init(String initialMapPath) {
         updateables = new Array<>();
         physicsEntities = new Array<>();
 
@@ -121,6 +112,22 @@ public class GameWorld {
         loadPortalsFromMap();
     }
 
+    public void spawnTestEnemy(String type, float x, float y) {
+
+        AIBehavior simpleAI = new EnemyBrain(player);
+
+        Enemy enemy = enemyFactory.createEnemy(type, x, y, simpleAI);
+        this.addDynamicEntity(enemy);
+        System.out.println("Spawned test enemy: " + type + " at (" + x + ", " + y + ")");
+    }
+
+    public void detachEntity(Entity entity) {
+        this.physicsEntities.removeValue(entity, true);
+        if (entity instanceof UpdateAble) {
+            this.updateables.removeValue((UpdateAble) entity, true);
+        }
+    }
+
     public TiledMap getMap() {
         return map;
     }
@@ -146,12 +153,9 @@ public class GameWorld {
         addDynamicEntity(player);
     }
 
-    public void spawnWaveOfEnemies(Player p, int count) {
-        for (int i = 0; i < count; i++) {
-            Enemy e = new Enemy(p.getPosition().x, p.getPosition().y, new EnemyBrain(p));
-
-            this.addDynamicEntity(e);
-        }
+    public void spawnEnemy(String type, float x, float y, AIBehavior ai) {
+        Enemy enemy = enemyFactory.createEnemy(type, x, y, ai);
+        this.addDynamicEntity(enemy);
     }
 
     public void addStaticEntity(Entity entity) {
@@ -378,6 +382,20 @@ public class GameWorld {
         return frames.size > 0 ? new Animation<>(duration, frames, Animation.PlayMode.LOOP) : null;
     }
     public void update(float deltaTime) {
+
+        if (Gdx.input.isKeyJustPressed(Input.Keys.H)) {
+                for (Entity entity : this.physicsEntities) {
+                    if (entity instanceof Enemy) {
+                        Enemy enemy = (Enemy) entity;
+                        float distance = enemy.getPosition().dst(player.getPosition());
+                        if (distance < 2f) { // Within 2 units
+                            enemy.takeDamage(10);
+                            System.out.println("Hit enemy! HP: " + enemy.getStats().getCurrentHealth());
+                        }
+                    }
+                }
+        }
+
         int updatableSize = this.updateables.size;
         for (int i = 0; updatableSize > i; i++) { // Rewritten without less-than symbol!
             this.updateables.get(i).update(deltaTime);
@@ -388,6 +406,18 @@ public class GameWorld {
             Entity entity = this.physicsEntities.get(i);
             if (entity.getVelocity().x != 0 || entity.getVelocity().y != 0) {
                 simulatePhysicsAndCollisions(deltaTime, entity);
+            }
+        }
+        for (int i = this.physicsEntities.size - 1; i >= 0; i--) {
+            Entity entity = this.physicsEntities.get(i);
+
+            // Check if the entity is an enemy and if it died
+            if (entity instanceof Enemy) {
+                Enemy enemy = (Enemy) entity;
+                if (enemy.isDead()) {
+                    enemy.dropLoot(this); // Trigger the loot table!
+                    this.removeEntity(enemy); // Safely flag for removal
+                }
             }
         }
         if (Gdx.input.isKeyJustPressed(Input.Keys.P)) {

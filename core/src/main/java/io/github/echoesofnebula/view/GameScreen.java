@@ -24,6 +24,8 @@ import com.badlogic.gdx.utils.viewport.ScreenViewport;
 import io.github.echoesofnebula.core.GameContext;
 import io.github.echoesofnebula.core.GameWorld;
 import io.github.echoesofnebula.core.PortalData;
+import io.github.echoesofnebula.entities.Enemy;
+import io.github.echoesofnebula.entities.Entity;
 import io.github.echoesofnebula.entities.Player;
 import io.github.echoesofnebula.input.PlayerController;
 import io.github.echoesofnebula.input.PlayerInputProcessor;
@@ -83,6 +85,7 @@ public class GameScreen implements Screen {
         playerController = new PlayerController(context, playerInputProcessor);
         cameraManager = new CameraManager(camera);
 
+        world.spawnTestEnemy("test_slime", spawnPoint.x + 3f, spawnPoint.y);
         ParticleTestHub.initialize(GameScreen.UNIT_SCALE);
     }
 
@@ -149,6 +152,7 @@ public class GameScreen implements Screen {
             isPaused = !isPaused;
         }
 
+
         // 2. PAUSED STATE: Freeze everything and draw overlay
         if (isPaused) {
             ScreenUtils.clear(0, 0, 0, 1f);
@@ -214,25 +218,42 @@ public class GameScreen implements Screen {
     }
 
     private void changeActiveMap(PortalData transition) {
-        mapRenderer.dispose();
+        GameWorld oldWorld = context.getWorld();
         Player activePlayer = context.getPlayer();
-        if (activePlayer != null) {
-            activePlayer.setIntent(new PlayerIntent());
-        }
-        context.getWorld().dispose();
 
-        GameWorld freshWorld = new GameWorld(transition.targetMapPath, assetHub);
+        if (activePlayer != null) {
+            // Reset player input state
+            activePlayer.setIntent(new PlayerIntent());
+
+            // 1. Detach player from old world so it can be cached cleanly
+            oldWorld.detachEntity(activePlayer);
+        }
+
+        // 🚫 CRITICAL: DO NOT call oldWorld.dispose() here!
+        // We want the MapCacheManager to keep it alive in memory.
+
+        // 2. Ask the cache for the world.
+        // If it exists, it returns the EXACT state you left it in.
+        // If it's new, MapCacheManager will call 'new GameWorld()' and init() will load it from disk.
+        GameWorld targetWorld = mapCacheManager.getOrCreateWorld(transition.targetMapPath);
+
+        // 3. Teleport player to the new map's spawn point
         activePlayer.getPosition().set(transition.targetSpawnPosition);
         activePlayer.getBounds().setPosition(activePlayer.getPosition().x, activePlayer.getPosition().y);
-        freshWorld.addDynamicEntity(activePlayer);
 
-        context.setWorld(freshWorld);
+        // 4. Add player to the new world
+        targetWorld.addDynamicEntity(activePlayer);
+
+        // 5. Update Context and Renderer
+        context.setWorld(targetWorld);
         context.setPlayer(activePlayer);
 
-        this.mapRenderer = new CustomTiledMapRenderer(context.getWorld().getMap(), GameScreen.UNIT_SCALE);
+        // 6. Swap the renderer to point to the new map
+        this.mapRenderer.dispose();
+        this.mapRenderer = new CustomTiledMapRenderer(targetWorld.getMap(), GameScreen.UNIT_SCALE);
         this.initMapLayers();
-        context.getWorld().clearPendingTransition();
 
+        targetWorld.clearPendingTransition();
         System.out.println("Transition complete. Player safe position: " + activePlayer.getPosition());
     }
 
@@ -279,15 +300,14 @@ public class GameScreen implements Screen {
     public void dispose() {
         shapeRenderer.dispose();
         batch.dispose();
-        mapRenderer.dispose();
-        if (context.getWorld() != null) context.getWorld().dispose();
-        ParticleTestHub.dispose();
+        if (mapRenderer != null) mapRenderer.dispose();
         if (pauseStage != null) pauseStage.dispose();
         if (pauseSkin != null) pauseSkin.dispose();
-        mapCacheManager.disposeAll();
+        ParticleTestHub.dispose();
 
-        // ⚠️ CRITICAL FIX: Do NOT dispose of assetHub here!
-        // If you return to the Main Menu, it still needs the fonts and UI assets.
-        // if (assetHub != null) assetHub.dispose();
+        // Let the MapCacheManager handle disposing ALL cached worlds and their TiledMaps
+        if (mapCacheManager != null) {
+            mapCacheManager.disposeAll();
+        }
     }
 }

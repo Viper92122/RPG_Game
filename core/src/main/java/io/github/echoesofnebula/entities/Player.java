@@ -32,7 +32,7 @@ public class Player extends Entity implements  SpriteRenderable, UpdateAble, Ite
     private Animation<TextureRegion> walkSideUpRightAnim;
     private Animation<TextureRegion> walkSideUpLeftAnim;
     private Animation<TextureRegion> walkUpAnim;
-
+    private final Stats stats;
     private float stateTime = 0f;
     private boolean isMoving = false;
 
@@ -55,7 +55,7 @@ public class Player extends Entity implements  SpriteRenderable, UpdateAble, Ite
 
         float hitboxWidth = size * 0.75f;
         float hitboxHeight = size * 0.40f;
-
+        this.stats = new Stats(100, 50, 5.0f, 10);
         // Update your bounds instance directly
         this.bounds.set(startX + (size - hitboxWidth) / 2f, startY, hitboxWidth, hitboxHeight);
 
@@ -251,18 +251,21 @@ public class Player extends Entity implements  SpriteRenderable, UpdateAble, Ite
 
     @Override
     public void heal(int amount) {
-
+        stats.setCurrentHealth(stats.getCurrentHealth() + amount);
+        System.out.println("Player healed! HP: " + stats.getCurrentHealth() + "/" + stats.getMaxHealth());
     }
 
     @Override
     public void restoreMana(int amount) {
-
+        stats.setCurrentMana(stats.getCurrentMana() + amount);
+        System.out.println("Player restored mana! MP: " + stats.getCurrentMana() + "/" + stats.getMaxMana());
     }
 
     @Override
     public void applyStatusEffect(String status) {
-
+        System.out.println("Player affected by: " + status);
     }
+
     public PlayerIntent getMovementIntent() {
        return this.currentIntent;
     }

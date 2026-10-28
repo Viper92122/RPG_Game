@@ -10,7 +10,7 @@ public class RoamState implements EnemyState {
 
     @Override
     public void update(Enemy enemy, EnemyBrain brain, float deltaTime) {
-        if (enemy.getPosition().dst(brain.getPlayerTarget().getPosition()) <= enemy.getEnemyRangeToSeePlayer()) {
+        if (enemy.getPosition().dst(brain.getPlayerTarget().getPosition()) <= enemy.getStats().getRange()) {
             brain.changeState(new ChaseState());
             return;
         }

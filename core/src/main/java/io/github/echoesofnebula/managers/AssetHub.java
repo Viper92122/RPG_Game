@@ -2,8 +2,12 @@ package io.github.echoesofnebula.managers;
 
 import com.badlogic.gdx.assets.AssetManager;
 import com.badlogic.gdx.assets.loaders.resolvers.InternalFileHandleResolver;
+import com.badlogic.gdx.graphics.Color;
+import com.badlogic.gdx.graphics.Pixmap;
+import com.badlogic.gdx.graphics.Texture;
 import com.badlogic.gdx.graphics.g2d.BitmapFont;
 import com.badlogic.gdx.graphics.g2d.TextureAtlas;
+import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.maps.tiled.TiledMap;
 import com.badlogic.gdx.maps.tiled.TmxMapLoader;
 import com.badlogic.gdx.utils.Array;
@@ -13,7 +17,7 @@ public class AssetHub {
     private final AssetManager manager;
     private static final String ATLAS_PATH = "sprites/game_assets.atlas";
     private TextureAtlas atlas;
-
+    private static Texture whitePixel;
     public AssetHub() {
         this.manager = new AssetManager();
 
@@ -21,6 +25,17 @@ public class AssetHub {
         manager.setLoader(TiledMap.class, new TmxMapLoader(new InternalFileHandleResolver()));
     }
 
+
+    public static TextureRegion getWhitePixel() {
+        if (whitePixel == null) {
+            Pixmap pixmap = new Pixmap(1, 1, Pixmap.Format.RGBA8888);
+            pixmap.setColor(Color.WHITE);
+            pixmap.fill();
+            whitePixel = new Texture(pixmap);
+            pixmap.dispose();
+        }
+        return new TextureRegion(whitePixel);
+    }
     public void queueInitialAssets() {
         manager.load(ATLAS_PATH, TextureAtlas.class);
     }
