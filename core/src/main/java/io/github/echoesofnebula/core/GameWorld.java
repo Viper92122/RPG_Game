@@ -55,7 +55,14 @@ public class GameWorld {
         updateables = new Array<>();
         physicsEntities = new Array<>();
 
-        map = new TmxMapLoader().load(initialMapPath);
+        // 1. Try to get the asynchronously loaded map first
+        this.map = assetHub.getMap(initialMapPath);
+
+        // 2. Fallback for dynamic maps not pre-queued (prevents crashes during portal transitions)
+        if (this.map == null) {
+            System.out.println("⚠️ Map not pre-loaded, loading synchronously (may cause minor hitch): " + initialMapPath);
+            this.map = new TmxMapLoader().load(initialMapPath);
+        }
 
         MapProperties prop = getMap().getProperties();
         float width = prop.get("width", Integer.class) * prop.get("tilewidth", Integer.class);
@@ -160,8 +167,8 @@ public class GameWorld {
                 }
 
                 String targetMap = props.get("targetMap", String.class);
-                float targetX = 64f;
-                float targetY = 64f;
+                float targetX = 64f * GameScreen.UNIT_SCALE;
+                float targetY = 64f * GameScreen.UNIT_SCALE;
 
                 if (props.containsKey("targetX")) {
                     Object xObj = props.get("targetX");
@@ -223,13 +230,23 @@ public class GameWorld {
             }
 
             // 2. Parse frame dimensions and map coordinates
+            // 2. Parse frame dimensions (used strictly for slicing the sprite sheet)
             int frameW = getFrameWidth(tileObj, primaryRegion);
-            int frameH = primaryRegion.originalHeight;
+            int frameH = getFrameHeight(tileObj, primaryRegion);
 
-            float scaledW = frameW * GameScreen.UNIT_SCALE;
-            float scaledH = frameH * GameScreen.UNIT_SCALE;
+// 3. Parse render dimensions (used for drawing the item on screen)
+// This allows you to make the potion visually smaller than its actual sprite sheet size!
+            float renderW = tileObj.getProperties().containsKey("render_width") ?
+                ((Number) tileObj.getProperties().get("render_width")).floatValue() : (float) frameW;
+
+            float renderH = tileObj.getProperties().containsKey("render_height") ?
+                ((Number) tileObj.getProperties().get("render_height")).floatValue() : (float) frameH;
+
+            float scaledW = renderW * GameScreen.UNIT_SCALE;
+            float scaledH = renderH * GameScreen.UNIT_SCALE;
+
             float x = tileObj.getX() * GameScreen.UNIT_SCALE;
-            float y = (tileObj.getY() * GameScreen.UNIT_SCALE) - scaledH;
+            float y = (tileObj.getY() * GameScreen.UNIT_SCALE) - scaledH; // Anchors to the bottom
 
             // 3. Build animation if needed
             Array<AtlasRegion> indexedRegions = assetHub.getRegions(atlasKey);
@@ -254,21 +271,27 @@ public class GameWorld {
         return (key == null || key.trim().isEmpty()) ? defaultKey : key;
     }
 
+
     private int getFrameWidth(TiledMapTileMapObject tileObj, AtlasRegion region) {
-        // 1. If an explicit frame_width custom property exists, prioritize it
+        // ALWAYS check for explicit frame_width first
         if (tileObj.getProperties().containsKey("frame_width")) {
             return ((Number) tileObj.getProperties().get("frame_width")).intValue();
         }
+        // Fallback logic...
+        return region.getRegionWidth();
+    }
 
-        // 2. 🌟 NEW AUTOMATED FALLBACK: Check if the asset is a horizontal strip sheet
-        boolean isStrip = region.originalWidth > region.originalHeight;
-        if (isStrip && tileObj.getProperties().containsKey("width")) {
-            // Use the object's width defined directly inside Tiled (15.0 in your case!)
-            return ((Number) tileObj.getProperties().get("width")).intValue();
+    private int getFrameHeight(TiledMapTileMapObject tileObj, AtlasRegion region) {
+        // 1. If an explicit frame_height custom property exists, prioritize it
+        if (tileObj.getProperties().containsKey("frame_height")) {
+            return ((Number) tileObj.getProperties().get("frame_height")).intValue();
         }
-
+        // 2. Fallback to Tiled object's height property if available
+        if (tileObj.getProperties().containsKey("height")) {
+            return ((Number) tileObj.getProperties().get("height")).intValue();
+        }
         // 3. Static fallback boundary
-        return region.originalWidth;
+        return region.originalHeight;
     }
 
     private Animation<TextureRegion> createAnimation(
@@ -279,15 +302,18 @@ public class GameWorld {
 
         String entityName = tileObj.getName() != null ? tileObj.getName() : "Unnamed (" + primaryRegion.name + ")";
         boolean isIndexed = indexedRegions != null && indexedRegions.size > 1;
-        boolean isStrip = primaryRegion.originalWidth > primaryRegion.originalHeight;
+
+        // 🌟 NEW: Calculate total frames based on a grid (handles horizontal, vertical, AND grid sheets)
+        int totalFrames = (primaryRegion.getRegionWidth() / frameW) * (primaryRegion.getRegionHeight() / frameH);
 
         System.out.println("🔍 Scanning Asset [" + entityName + "]:");
-        System.out.println("   -> Atlas Info: Region Size=[" + primaryRegion.getRegionWidth() + "x" + primaryRegion.getRegionHeight() +
-            "], Original Size=[" + primaryRegion.originalWidth + "x" + primaryRegion.originalHeight + "]");
-        System.out.println("   -> Animation Type Flags: isIndexed=" + isIndexed + ", isStrip=" + isStrip);
+        System.out.println("   -> Atlas Region Size: [" + primaryRegion.getRegionWidth() + "x" + primaryRegion.getRegionHeight() + "]");
+        System.out.println("   -> Target Frame Size: [" + frameW + "x" + frameH + "]");
+        System.out.println("   -> Calculated Total Frames: " + totalFrames);
+        System.out.println("   -> isIndexed: " + isIndexed);
 
-        if (!isIndexed && !isStrip) {
-            System.out.println("   -> ⏸️ Static Item Detected. No animation compiled.");
+        if (!isIndexed && totalFrames <= 1) {
+            System.out.println("   -> ⏸️ Static Item Detected (1 frame). No animation compiled.");
             return null;
         }
 
@@ -297,37 +323,35 @@ public class GameWorld {
         Array<TextureRegion> frames = new Array<>();
 
         if (isIndexed) {
-            System.out.println("   -> 🎞️ Compilation: Multi-file Indexed Sequence found. Total frames: " + indexedRegions.size);
+            System.out.println("   -> 🎞️ Compilation: Multi-file Indexed Sequence found.");
             for (AtlasRegion r : indexedRegions) {
                 frames.add(r);
             }
         } else {
-            // Handle single horizontal strip (e.g. 288x39 healthPotion)
-            int totalFrames = primaryRegion.getRegionWidth() / frameW;
-            System.out.println("   -> 🎞️ Compilation: Strip Image Sheet detected.");
-            System.out.println("      * Slice Math: RegionWidth (" + primaryRegion.getRegionWidth() + ") / Calculated FrameWidth (" + frameW + ")");
-            System.out.println("      * Resulting Total Frames: " + totalFrames);
+            System.out.println("   -> 🎞️ Compilation: Sprite Sheet detected. Slicing into " + totalFrames + " frames.");
 
-            // 🌟 CRITICAL FIX: Extract explicit texture frame coordinates mapping cleanly across the atlas sheet page bounds
-            for (int i = 0; i < totalFrames; i++) {
-                int frameX = primaryRegion.getRegionX() + (i * frameW);
-                int frameY = primaryRegion.getRegionY();
+            int cols = primaryRegion.getRegionWidth() / frameW;
+            int rows = primaryRegion.getRegionHeight() / frameH;
 
-                // Generate texture segments pointing explicitly to absolute texture sheet pixel offsets
-                TextureRegion individualFrame = new TextureRegion(
-                    primaryRegion.getTexture(),
-                    frameX,
-                    frameY,
-                    frameW,
-                    frameH
-                );
+            for (int row = 0; row < rows; row++) {
+                for (int col = 0; col < cols; col++) {
+                    int frameX = primaryRegion.getRegionX() + (col * frameW);
+                    int frameY = primaryRegion.getRegionY() + (row * frameH);
 
-                frames.add(individualFrame);
+                    TextureRegion individualFrame = new TextureRegion(
+                        primaryRegion.getTexture(),
+                        frameX,
+                        frameY,
+                        frameW,
+                        frameH
+                    );
+                    frames.add(individualFrame);
+                }
             }
         }
 
         System.out.println("   -> ⚡ Animation built successfully with " + frames.size + " frames at " + duration + "s per frame.");
-        return frames.size > 0 ? new Animation<>(duration, frames, PlayMode.LOOP) : null;
+        return frames.size > 0 ? new Animation<>(duration, frames, Animation.PlayMode.LOOP) : null;
     }
     public void update(float deltaTime) {
         int updatableSize = this.updateables.size;

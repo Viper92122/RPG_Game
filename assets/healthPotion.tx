@@ -1,10 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <template>
  <tileset firstgid="1" source="glowing_potion.tsx"/>
- <object name="healthPotion" type="ConsumableItem" gid="11" width="15" height="20">
+ <object name="healthPotion" gid="12" width="24" height="39">
   <properties>
-   <property name="consumable" type="bool" value="true"/>
-   <property name="heal_amount" type="float" value="25"/>
+   <property name="frame_height" type="int" value="39"/>
+   <property name="frame_width" type="int" value="24"/>
+   <property name="render_height" type="int" value="6"/>
+   <property name="render_width" type="int" value="6"/>
   </properties>
  </object>
 </template>

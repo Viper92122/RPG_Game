@@ -1,4 +1,4 @@
-package io.github.echoesofnebula.view;
+package io.github.echoesofnebula.managers;
 
 
 import com.badlogic.gdx.graphics.OrthographicCamera;

@@ -1,6 +1,8 @@
 package io.github.echoesofnebula.view;
 
+import com.badlogic.gdx.Game;
 import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.Screen;
 import com.badlogic.gdx.graphics.OrthographicCamera;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
@@ -16,18 +18,19 @@ import io.github.echoesofnebula.entities.Player;
 import io.github.echoesofnebula.input.PlayerController;
 import io.github.echoesofnebula.input.PlayerInputProcessor;
 import io.github.echoesofnebula.managers.AssetHub;
+import io.github.echoesofnebula.managers.CameraManager;
 import io.github.echoesofnebula.managers.MapCacheManager;
 import io.github.echoesofnebula.managers.ParticleTestHub;
 import io.github.echoesofnebula.input.PlayerIntent;
 
-public class GameScreen {
+public class GameScreen implements Screen {
     private final ShapeRenderer shapeRenderer;
     private final OrthographicCamera camera;
     private final SpriteBatch batch;
     private final AssetHub assetHub;
 
     private MapCacheManager mapCacheManager;
-    private final GameContext context; // Managed lifecycle instance
+    private final GameContext context;
     private CustomTiledMapRenderer mapRenderer;
     private int[] groundLayers;
     private int[] foregroundLayers;
@@ -36,17 +39,19 @@ public class GameScreen {
 
     public static final float UNIT_SCALE = 1f / 16f;
 
-    public GameScreen() {
-        assetHub = new AssetHub();
-        assetHub.queueLoading();
-        assetHub.finishLoading();
+    // UPDATED: Accept AssetHub as a parameter
+    public GameScreen(Game game, AssetHub assetHub) {
+        this.assetHub = assetHub;
+
+        // REMOVED: assetHub.queueLoading();
+        // REMOVED: assetHub.finishLoading();
 
         context = new GameContext();
-
         mapCacheManager = new MapCacheManager(assetHub);
+
+        // This is now instant because LoadingScreen already queued and loaded it
         GameWorld world = mapCacheManager.getOrCreateWorld("tilemap_first.tmx");
 
-        // Spawn point is already pre-scaled to meters inside GameWorld
         Vector2 spawnPoint = world.findSpawnPointFromMap();
         world.spawnPlayer(assetHub, spawnPoint.x, spawnPoint.y);
 
@@ -64,17 +69,14 @@ public class GameScreen {
         mapRenderer = new CustomTiledMapRenderer(context.getWorld().getMap(), UNIT_SCALE);
         initMapLayers();
 
-        // context.getWorld().spawnWaveOfEnemies(context.getPlayer(), 30);
-
         PlayerInputProcessor playerInputProcessor = new PlayerInputProcessor();
-
         playerController = new PlayerController(context, playerInputProcessor);
         cameraManager = new CameraManager(camera);
 
         ParticleTestHub.initialize(GameScreen.UNIT_SCALE);
     }
 
-    public void render() {
+    public void render(float delta) {
         ScreenUtils.clear(0, 0, 0, 1f);
         AnimatedTiledMapTile.updateAnimationBaseTime();
 
@@ -82,18 +84,7 @@ public class GameScreen {
         GameWorld activeWorld = context.getWorld();
         activeWorld.update(Gdx.graphics.getDeltaTime());
 
-
-        // 2. Map level loading transitions
-        /* PortalData transition = activeWorld.getPendingTransition();
-        if (transition != null) {
-            changeActiveMap(transition);
-            activeWorld = context.getWorld();
-        } */
-
-        // 3. Move the camera's target positions
         cameraManager.updateTracking(context);
-
-
         camera.update();
 
         mapRenderer.setView(camera);
@@ -123,6 +114,7 @@ public class GameScreen {
 
         context.getWorld().dispose();
 
+        // This will use the async map if preloaded, or fallback gracefully if it's a new map
         GameWorld freshWorld = new GameWorld(transition.targetMapPath, assetHub);
 
         activePlayer.getPosition().set(transition.targetSpawnPosition);
@@ -136,7 +128,6 @@ public class GameScreen {
         this.mapRenderer = new CustomTiledMapRenderer(context.getWorld().getMap(), GameScreen.UNIT_SCALE);
         this.initMapLayers();
 
-        // Clear the gate variables safely
         context.getWorld().clearPendingTransition();
         System.out.println("Transition complete. Player safe position: " + activePlayer.getPosition());
     }
@@ -156,6 +147,32 @@ public class GameScreen {
         }
         this.groundLayers = groundIndices.toArray();
         this.foregroundLayers = foregroundIndices.toArray();
+    }
+
+    @Override
+    public void show() {
+
+    }
+
+
+    @Override
+    public void resize(int width, int height) {
+
+    }
+
+    @Override
+    public void pause() {
+
+    }
+
+    @Override
+    public void resume() {
+
+    }
+
+    @Override
+    public void hide() {
+
     }
 
     public void dispose() {
