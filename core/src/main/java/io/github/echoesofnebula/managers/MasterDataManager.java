@@ -2,7 +2,6 @@ package io.github.echoesofnebula.managers;
 
 
 public class MasterDataManager {
-
     private static DialogRegistry dialogRegistry;
     private static SpellRegistry spellRegistry;
 
