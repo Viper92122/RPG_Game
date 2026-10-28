@@ -13,7 +13,7 @@ import io.github.echoesofnebula.input.PlayerIntent;
 import io.github.echoesofnebula.items.Inventory;
 import io.github.echoesofnebula.events.CollisionEventData;
 import io.github.echoesofnebula.managers.AssetHub;
-import io.github.echoesofnebula.managers.ParticleTestHub;
+import io.github.echoesofnebula.managers.ParticleSystem;
 public class Player extends Entity implements  SpriteRenderable, UpdateAble, ItemUser {
     private float walkingSpeed = 5.0f;
     private float runningSpeed = 9.0f;
@@ -97,7 +97,7 @@ public class Player extends Entity implements  SpriteRenderable, UpdateAble, Ite
                 Vector2 launchDirection = getFacingVector();
 
                 // 2. Spawn your fire particle system
-                ParticleTestHub.spawn(ParticleTestHub.ParticleType.FIRE, spawnX, spawnY);
+                ParticleSystem.spawn(ParticleSystem.ParticleType.FIRE, spawnX, spawnY);
 
                 // 3. TODO: Instantiate your Fireball projectile entity here, passing it:
                 //    spawnX, spawnY, and launchDirection (e.g. projectile.setVelocity(launchDirection.scl(projectileSpeed)))
@@ -237,7 +237,7 @@ public class Player extends Entity implements  SpriteRenderable, UpdateAble, Ite
 
     @Override
     public void acceptCollision(GameWorld world, CollisionEventData event) {
-        ParticleTestHub.spawn(ParticleTestHub.ParticleType.FIRE, this.getPosition().x, this.getPosition().y);
+        ParticleSystem.spawn(ParticleSystem.ParticleType.FIRE, this.getPosition().x, this.getPosition().y);
         world.handlePlayerCollision(this, event);
     }
 

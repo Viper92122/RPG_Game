@@ -6,7 +6,7 @@ import java.util.function.Function;
 
 import io.github.echoesofnebula.items.ItemEffect;
 
-public class ItemEffectRegistry {
+public class ItemEffectFactory {
     private static final Map<String, Function<Float, ItemEffect>> REGISTRY = new HashMap<>();
 
     static {

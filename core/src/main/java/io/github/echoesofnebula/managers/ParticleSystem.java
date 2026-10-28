@@ -8,7 +8,7 @@ import com.badlogic.gdx.graphics.g2d.ParticleEffectPool.PooledEffect;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.ObjectMap;
 
-public class ParticleTestHub {
+public class ParticleSystem {
     public enum ParticleType {
         FIRE("particles/fire.p");
         final String filePath;

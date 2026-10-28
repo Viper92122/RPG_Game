@@ -3,7 +3,6 @@ package io.github.echoesofnebula.core;
 import com.badlogic.gdx.Gdx;
 import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.g2d.Animation;
-import com.badlogic.gdx.graphics.g2d.Animation.PlayMode;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureAtlas.AtlasRegion;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
@@ -24,15 +23,12 @@ import io.github.echoesofnebula.ai.AIBehavior;
 import io.github.echoesofnebula.ai.EnemyBrain;
 import io.github.echoesofnebula.entities.Enemy;
 import io.github.echoesofnebula.entities.Entity;
-import io.github.echoesofnebula.core.UpdateAble;
 import io.github.echoesofnebula.entities.Player;
-import io.github.echoesofnebula.entities.Stats;
 import io.github.echoesofnebula.environment.SolidObstacle;
 import io.github.echoesofnebula.events.CollisionEventData;
-import io.github.echoesofnebula.items.LootTable;
 import io.github.echoesofnebula.items.MapEntityFactory;
 import io.github.echoesofnebula.managers.EnemyFactory;
-import io.github.echoesofnebula.managers.ItemEffectRegistry;
+import io.github.echoesofnebula.managers.ItemEffectFactory;
 import io.github.echoesofnebula.items.ItemEffect;
 import io.github.echoesofnebula.items.ConsumableItem;
 import io.github.echoesofnebula.items.Item;
@@ -96,7 +92,7 @@ public class GameWorld {
                 float intensity = tileObj.getProperties().containsKey("intensity") ?
                     ((Number) tileObj.getProperties().get("intensity")).floatValue() : 50f;
 
-                ItemEffect concreteEffect = ItemEffectRegistry.createEffect(actionType, intensity);
+                ItemEffect concreteEffect = ItemEffectFactory.createEffect(actionType, intensity);
 
                 // 🌟 CHECK: Double check that 'w' and 'h' are passed to ConsumableItem!
                 return (anim != null) ?

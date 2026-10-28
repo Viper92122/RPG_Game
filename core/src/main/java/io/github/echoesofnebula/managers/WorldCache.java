@@ -3,11 +3,11 @@ package io.github.echoesofnebula.managers;
 import com.badlogic.gdx.utils.ObjectMap;
 import io.github.echoesofnebula.core.GameWorld;
 
-public class MapCacheManager {
+public class WorldCache {
     private final ObjectMap<String, GameWorld> loadedWorlds = new ObjectMap<>();
     private final AssetHub assetHub;
 
-    public MapCacheManager(AssetHub assetHub) {
+    public WorldCache(AssetHub assetHub) {
         this.assetHub = assetHub;
     }
     public GameWorld getOrCreateWorld(String mapPath) {

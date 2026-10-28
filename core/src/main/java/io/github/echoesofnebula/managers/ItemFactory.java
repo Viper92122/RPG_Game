@@ -8,9 +8,7 @@ import io.github.echoesofnebula.items.ConsumableItem;
 import io.github.echoesofnebula.items.Item;
 import io.github.echoesofnebula.items.ItemEffect;
 import io.github.echoesofnebula.view.GameScreen;
-import com.badlogic.gdx.graphics.g2d.Animation;
-import com.badlogic.gdx.graphics.g2d.TextureRegion;
-import com.badlogic.gdx.utils.Array;
+
 /**
  * Central factory for creating all items in the game.
  * Add new items here as your game grows!
@@ -54,7 +52,7 @@ public class ItemFactory {
             return null;
         }
 
-        ItemEffect effect = ItemEffectRegistry.createEffect("HEAL", 50f);
+        ItemEffect effect = ItemEffectFactory.createEffect("HEAL", 50f);
 
         float customRenderW = 6f * GameScreen.UNIT_SCALE; // Adjust this value!
         float customRenderH = 6f * GameScreen.UNIT_SCALE; // Adjust this value!
@@ -98,14 +96,14 @@ public class ItemFactory {
     private ConsumableItem createManaPotion(float x, float y, float w, float h) {
         TextureRegion tex = assetHub.getRegion("manaPotion"); // You'd add this to your atlas
         if (tex == null) return null;
-        ItemEffect effect = ItemEffectRegistry.createEffect("RESTORE_MANA", 30f);
+        ItemEffect effect = ItemEffectFactory.createEffect("RESTORE_MANA", 30f);
         return new ConsumableItem("Mana Potion", x, y, w, h, effect, tex);
     }
 
     private ConsumableItem createStrengthElixir(float x, float y, float w, float h) {
         TextureRegion tex = assetHub.getRegion("strengthElixir");
         if (tex == null) return null;
-        ItemEffect effect = ItemEffectRegistry.createEffect("BUFF_STRENGTH", 25f);
+        ItemEffect effect = ItemEffectFactory.createEffect("BUFF_STRENGTH", 25f);
         return new ConsumableItem("Strength Elixir", x, y, w, h, effect, tex);
     }
 }

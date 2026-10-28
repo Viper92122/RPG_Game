@@ -24,7 +24,7 @@ public class EnemyFactory {
             case "test_slime":
                 // Simple rectangle enemy for testing
                 stats = new Stats(20, 0, 2.0f, 3); // 20 HP, 0 Mana, Speed 2, Damage 3
-                lootTable.addLoot("healthPotion", 0.5f, 1, 1); // 50% chance for 1 potion
+                lootTable.addLoot("healthPotion", 1f, 1, 1); // 50% chance for 1 potion
                 // No animations - will use rectangle fallback
                 break;
             case "boss":

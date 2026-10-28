@@ -24,24 +24,24 @@ import com.badlogic.gdx.utils.viewport.ScreenViewport;
 import io.github.echoesofnebula.core.GameContext;
 import io.github.echoesofnebula.core.GameWorld;
 import io.github.echoesofnebula.core.PortalData;
-import io.github.echoesofnebula.entities.Enemy;
-import io.github.echoesofnebula.entities.Entity;
 import io.github.echoesofnebula.entities.Player;
 import io.github.echoesofnebula.input.PlayerController;
 import io.github.echoesofnebula.input.PlayerInputProcessor;
 import io.github.echoesofnebula.input.PlayerIntent;
 import io.github.echoesofnebula.managers.AssetHub;
 import io.github.echoesofnebula.managers.CameraManager;
-import io.github.echoesofnebula.managers.MapCacheManager;
-import io.github.echoesofnebula.managers.ParticleTestHub;
+import io.github.echoesofnebula.managers.DialogRegistry;
+import io.github.echoesofnebula.managers.SpellRegistry;
+import io.github.echoesofnebula.managers.WorldCache;
+import io.github.echoesofnebula.managers.ParticleSystem;
 
 public class GameScreen implements Screen {
-    private final Game game; // ADDED: Reference to the main App class
+    private final Game game;
     private final ShapeRenderer shapeRenderer;
     private final OrthographicCamera camera;
     private final SpriteBatch batch;
     private final AssetHub assetHub;
-    private MapCacheManager mapCacheManager;
+    private WorldCache worldCache;
     private final GameContext context;
     private CustomTiledMapRenderer mapRenderer;
     private int[] groundLayers;
@@ -49,7 +49,6 @@ public class GameScreen implements Screen {
     private final PlayerController playerController;
     private final CameraManager cameraManager;
 
-    // --- PAUSE MENU FIELDS ---
     private boolean isPaused = false;
     private Stage pauseStage;
     private Skin pauseSkin;
@@ -57,36 +56,46 @@ public class GameScreen implements Screen {
     public static final float UNIT_SCALE = 1f / 16f;
 
     public GameScreen(Game game, AssetHub assetHub) {
-        this.game = game; // Save the reference
+        this.game = game;
         this.assetHub = assetHub;
 
-        context = new GameContext();
-        mapCacheManager = new MapCacheManager(assetHub);
-
-        GameWorld world = mapCacheManager.getOrCreateWorld("tilemap_first.tmx");
-        Vector2 spawnPoint = world.findSpawnPointFromMap();
-        world.spawnPlayer(assetHub, spawnPoint.x, spawnPoint.y);
-
-        context.setWorld(world);
-        context.setPlayer(world.getPlayer());
-
-        shapeRenderer = new ShapeRenderer();
-        batch = new SpriteBatch();
-        camera = new OrthographicCamera();
+        // 1. Initialize Core Rendering & Camera FIRST (so it's not null later)
+        this.shapeRenderer = new ShapeRenderer();
+        this.batch = new SpriteBatch();
+        this.camera = new OrthographicCamera();
 
         float viewportWidth = 15.0f;
         float viewportHeight = 10.0f;
-        camera.setToOrtho(false, viewportWidth, viewportHeight);
+        this.camera.setToOrtho(false, viewportWidth, viewportHeight);
 
-        mapRenderer = new CustomTiledMapRenderer(context.getWorld().getMap(), UNIT_SCALE);
-        initMapLayers();
+        // 2. Initialize Registries explicitly (No more MasterDataManager!)
+        DialogRegistry dialogs = new DialogRegistry();
+        dialogs.initialize();
 
-        PlayerInputProcessor playerInputProcessor = new PlayerInputProcessor();
-        playerController = new PlayerController(context, playerInputProcessor);
-        cameraManager = new CameraManager(camera);
+        SpellRegistry spells = new SpellRegistry();
+        spells.initialize();
 
-        world.spawnTestEnemy("test_slime", spawnPoint.x + 3f, spawnPoint.y);
-        ParticleTestHub.initialize(GameScreen.UNIT_SCALE);
+        // 3. Create the Context with everything it needs
+        this.context = new GameContext(dialogs, spells);
+
+        // 4. Setup World and Player
+        this.worldCache = new WorldCache(assetHub);
+        GameWorld world = worldCache.getOrCreateWorld("tilemap_first.tmx");
+        Vector2 spawnPoint = world.findSpawnPointFromMap();
+        world.spawnPlayer(assetHub, spawnPoint.x, spawnPoint.y);
+
+        // 5. Bind them to the Context
+        context.setWorld(world);
+        context.setPlayer(world.getPlayer());
+
+        // 6. Setup Map Renderer and Layers
+        this.mapRenderer = new CustomTiledMapRenderer(context.getWorld().getMap(), UNIT_SCALE);
+        this.initMapLayers();
+
+        // 7. Pass the Context to systems that need the "big picture"
+        // (Now 'camera' is safely initialized!)
+        this.playerController = new PlayerController(context, new PlayerInputProcessor());
+        this.cameraManager = new CameraManager(this.camera);
     }
 
     @Override
@@ -152,7 +161,6 @@ public class GameScreen implements Screen {
             isPaused = !isPaused;
         }
 
-
         // 2. PAUSED STATE: Freeze everything and draw overlay
         if (isPaused) {
             ScreenUtils.clear(0, 0, 0, 1f);
@@ -164,7 +172,7 @@ public class GameScreen implements Screen {
             batch.setProjectionMatrix(camera.combined);
             batch.begin();
             context.getWorld().drawTextures(batch);
-            ParticleTestHub.updateAndDraw(Gdx.graphics.getDeltaTime(), batch);
+            ParticleSystem.updateAndDraw(Gdx.graphics.getDeltaTime(), batch);
             batch.end();
 
             mapRenderer.render(foregroundLayers);
@@ -206,7 +214,7 @@ public class GameScreen implements Screen {
         batch.setProjectionMatrix(camera.combined);
         batch.begin();
         activeWorld.drawTextures(batch);
-        ParticleTestHub.updateAndDraw(Gdx.graphics.getDeltaTime(), batch);
+        ParticleSystem.updateAndDraw(Gdx.graphics.getDeltaTime(), batch);
         batch.end();
 
         mapRenderer.render(foregroundLayers);
@@ -229,13 +237,7 @@ public class GameScreen implements Screen {
             oldWorld.detachEntity(activePlayer);
         }
 
-        // 🚫 CRITICAL: DO NOT call oldWorld.dispose() here!
-        // We want the MapCacheManager to keep it alive in memory.
-
-        // 2. Ask the cache for the world.
-        // If it exists, it returns the EXACT state you left it in.
-        // If it's new, MapCacheManager will call 'new GameWorld()' and init() will load it from disk.
-        GameWorld targetWorld = mapCacheManager.getOrCreateWorld(transition.targetMapPath);
+        GameWorld targetWorld = worldCache.getOrCreateWorld(transition.targetMapPath);
 
         // 3. Teleport player to the new map's spawn point
         activePlayer.getPosition().set(transition.targetSpawnPosition);
@@ -298,16 +300,16 @@ public class GameScreen implements Screen {
 
     @Override
     public void dispose() {
-        shapeRenderer.dispose();
-        batch.dispose();
+        if (shapeRenderer != null) shapeRenderer.dispose();
+        if (batch != null) batch.dispose();
         if (mapRenderer != null) mapRenderer.dispose();
         if (pauseStage != null) pauseStage.dispose();
         if (pauseSkin != null) pauseSkin.dispose();
-        ParticleTestHub.dispose();
+        ParticleSystem.dispose();
 
-        // Let the MapCacheManager handle disposing ALL cached worlds and their TiledMaps
-        if (mapCacheManager != null) {
-            mapCacheManager.disposeAll();
+        // Let the WorldCache handle disposing ALL cached worlds and their TiledMaps
+        if (worldCache != null) {
+            worldCache.disposeAll();
         }
     }
 }

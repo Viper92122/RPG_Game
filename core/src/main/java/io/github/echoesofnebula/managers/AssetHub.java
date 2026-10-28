@@ -21,7 +21,6 @@ public class AssetHub {
     public AssetHub() {
         this.manager = new AssetManager();
 
-        // CRITICAL FIX: Tell the AssetManager how to load TiledMaps!
         manager.setLoader(TiledMap.class, new TmxMapLoader(new InternalFileHandleResolver()));
     }
 

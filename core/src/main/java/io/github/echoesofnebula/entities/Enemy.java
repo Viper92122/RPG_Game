@@ -23,11 +23,9 @@ public class Enemy extends Entity implements UpdateAble, SpriteRenderable, ItemU
     private final Animation<TextureRegion> idleAnim;
     private final Animation<TextureRegion> walkAnim;
     private float stateTime = 0f;
-
-    // NO AssetHub here! Just the data it needs to function.
     public Enemy(float startX, float startY, AIBehavior aiBehavior, Stats stats,
                  LootTable lootTable, Animation<TextureRegion> idleAnim, Animation<TextureRegion> walkAnim) {
-        this.pos.set(startX, startY); // Coordinates should ALREADY be scaled by the caller
+        this.pos.set(startX, startY);
         this.velocity.set(0, 0);
         this.bounds.set(startX, startY, size, size);
 
