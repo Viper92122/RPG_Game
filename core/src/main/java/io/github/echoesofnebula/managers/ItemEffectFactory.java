@@ -1,46 +1,45 @@
 package io.github.echoesofnebula.managers;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.function.Function;
-
+import com.badlogic.gdx.utils.ObjectMap;
 import io.github.echoesofnebula.items.ItemEffect;
+import io.github.echoesofnebula.items.effects.*;
 
 public class ItemEffectFactory {
-    private static final Map<String, Function<Float, ItemEffect>> REGISTRY = new HashMap<>();
+    private final ObjectMap<String, Class<? extends ItemEffect>> effectClasses = new ObjectMap<>();
 
-    static {
-        // ✨ Self-Aware Healing Effect Setup
-        REGISTRY.put("HEAL", intensity -> target -> {
-            System.out.println("✨ Strategy Executed: Healing target by " + intensity + " HP!");
-            // target.heal(intensity);
-        });
-
-        // 🔮 Self-Aware Mana Effect Setup
-        REGISTRY.put("MANA", intensity -> target -> {
-            System.out.println("🔮 Strategy Executed: Restoring target mana by " + intensity);
-            // target.restoreMana(intensity);
-        });
-
-        // 🛡️ Example expansion: Status Buff Setup
-        REGISTRY.put("BUFF", intensity -> target -> {
-            System.out.println("🛡️ Strategy Executed: Boosting defense attributes by " + intensity);
-        });
+    public ItemEffectFactory() {
+        // Register effect types (not instances - we'll create them with specific intensity)
+        effectClasses.put("HEAL", HealEffect.class);
+        effectClasses.put("MANA", ManaEffect.class);
+        effectClasses.put("BUFF", BuffEffect.class);
+        effectClasses.put("NONE", NoOpEffect.class);
     }
 
     /**
-     * Resolves an ItemEffect closure based on properties set up in Tiled maps.
-     * Safely falls back to a do-nothing effect if an unmapped action is requested.
+     * Creates a fully-configured effect with the specified intensity.
+     * This is the proper Factory pattern - returns a complete, ready-to-use object.
      */
-    public static ItemEffect createEffect(String actionType, float intensity) {
-        if (actionType == null) return target -> {};
-
-        Function<Float, ItemEffect> factory = REGISTRY.get(actionType.toUpperCase().trim());
-        if (factory != null) {
-            return factory.apply(intensity);
+    public ItemEffect createEffect(String effectType, float intensity) {
+        if (effectType == null || effectType.isEmpty()) {
+            return new NoOpEffect();
         }
 
-        System.err.println("⚠️ Unknown action type: '" + actionType + "'. Item will execute a neutral fallback.");
-        return target -> {};
+        Class<? extends ItemEffect> effectClass = effectClasses.get(effectType.toUpperCase().trim());
+        if (effectClass == null) {
+            System.err.println("⚠️ Unknown effect type: '" + effectType + "'. Using NoOp.");
+            return new NoOpEffect();
+        }
+
+        try {
+            // Create a new instance with the specific intensity
+            return effectClass.getConstructor(float.class).newInstance(intensity);
+        } catch (Exception e) {
+            System.err.println("❌ Failed to create effect: " + effectType);
+            return new NoOpEffect();
+        }
+    }
+
+    public boolean hasEffect(String effectType) {
+        return effectClasses.containsKey(effectType.toUpperCase().trim());
     }
 }

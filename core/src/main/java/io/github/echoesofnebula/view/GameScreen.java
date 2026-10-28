@@ -24,6 +24,8 @@ import com.badlogic.gdx.utils.viewport.ScreenViewport;
 import io.github.echoesofnebula.core.GameContext;
 import io.github.echoesofnebula.core.GameWorld;
 import io.github.echoesofnebula.core.PortalData;
+import io.github.echoesofnebula.entities.Enemy;
+import io.github.echoesofnebula.entities.Entity;
 import io.github.echoesofnebula.entities.Player;
 import io.github.echoesofnebula.input.PlayerController;
 import io.github.echoesofnebula.input.PlayerInputProcessor;
@@ -31,9 +33,11 @@ import io.github.echoesofnebula.input.PlayerIntent;
 import io.github.echoesofnebula.managers.AssetHub;
 import io.github.echoesofnebula.managers.CameraManager;
 import io.github.echoesofnebula.managers.DialogRegistry;
+import io.github.echoesofnebula.managers.ItemEffectFactory;
+import io.github.echoesofnebula.managers.ItemRegistry;
+import io.github.echoesofnebula.managers.ParticleSystem;
 import io.github.echoesofnebula.managers.SpellRegistry;
 import io.github.echoesofnebula.managers.WorldCache;
-import io.github.echoesofnebula.managers.ParticleSystem;
 
 public class GameScreen implements Screen {
     private final Game game;
@@ -48,71 +52,62 @@ public class GameScreen implements Screen {
     private int[] foregroundLayers;
     private final PlayerController playerController;
     private final CameraManager cameraManager;
-
     private boolean isPaused = false;
     private Stage pauseStage;
     private Skin pauseSkin;
-
     public static final float UNIT_SCALE = 1f / 16f;
 
     public GameScreen(Game game, AssetHub assetHub) {
-        this.game = game;
+        this.game = game; // FIX: Save the reference!
         this.assetHub = assetHub;
 
-        // 1. Initialize Core Rendering & Camera FIRST (so it's not null later)
+        // 1. Initialize Core Rendering & Camera FIRST
         this.shapeRenderer = new ShapeRenderer();
         this.batch = new SpriteBatch();
         this.camera = new OrthographicCamera();
+        this.camera.setToOrtho(false, 15.0f, 10.0f);
 
-        float viewportWidth = 15.0f;
-        float viewportHeight = 10.0f;
-        this.camera.setToOrtho(false, viewportWidth, viewportHeight);
-
-        // 2. Initialize Registries explicitly (No more MasterDataManager!)
         DialogRegistry dialogs = new DialogRegistry();
         dialogs.initialize();
-
         SpellRegistry spells = new SpellRegistry();
         spells.initialize();
+        ItemRegistry items = new ItemRegistry(); // ✅ NEW
+        items.initialize();
+        ItemEffectFactory effects = new ItemEffectFactory(); // ✅ NEW
+        this.context = new GameContext(dialogs, spells, items, effects);
 
-        // 3. Create the Context with everything it needs
-        this.context = new GameContext(dialogs, spells);
-
-        // 4. Setup World and Player
         this.worldCache = new WorldCache(assetHub);
-        GameWorld world = worldCache.getOrCreateWorld("tilemap_first.tmx");
+        GameWorld world = worldCache.getOrCreateWorld("tilemap_first.tmx", context.getItems(), context.getEffectFactory());
         Vector2 spawnPoint = world.findSpawnPointFromMap();
-        world.spawnPlayer(assetHub, spawnPoint.x, spawnPoint.y);
+        world.spawnPlayer(assetHub, spawnPoint.x, spawnPoint.y, effects);
 
-        // 5. Bind them to the Context
         context.setWorld(world);
         context.setPlayer(world.getPlayer());
 
-        // 6. Setup Map Renderer and Layers
         this.mapRenderer = new CustomTiledMapRenderer(context.getWorld().getMap(), UNIT_SCALE);
         this.initMapLayers();
 
-        // 7. Pass the Context to systems that need the "big picture"
-        // (Now 'camera' is safely initialized!)
         this.playerController = new PlayerController(context, new PlayerInputProcessor());
         this.cameraManager = new CameraManager(this.camera);
+        ParticleSystem.initialize(GameScreen.UNIT_SCALE);
+
+        world.spawnTestEnemy(spawnPoint.x + 3f, spawnPoint.y);
+        world.spawnTestEnemy(spawnPoint.x - 2f, spawnPoint.y + 2f);
     }
 
     @Override
     public void show() {
-        // --- PAUSE MENU INITIALIZATION ---
         pauseStage = new Stage(new ScreenViewport());
         try {
             pauseSkin = new Skin(Gdx.files.internal("ui/uiskin.json"));
         } catch (Exception e) {
-            pauseSkin = new Skin(); // Safe fallback
+            pauseSkin = new Skin();
         }
 
         Table pauseTable = new Table();
         pauseTable.setFillParent(true);
         pauseStage.addActor(pauseTable);
 
-        // Safe Font Setup
         BitmapFont buttonFont = assetHub.getFont("rpg_font");
         if (buttonFont == null) {
             buttonFont = new BitmapFont();
@@ -120,83 +115,74 @@ public class GameScreen implements Screen {
             buttonFont.setColor(Color.WHITE);
         }
 
-        TextButton.TextButtonStyle buttonStyle;
-        if (pauseSkin.has("default", TextButton.TextButtonStyle.class)) {
-            buttonStyle = pauseSkin.get("default", TextButton.TextButtonStyle.class);
-            if (buttonStyle.font == null) buttonStyle.font = buttonFont;
-        } else {
-            buttonStyle = new TextButton.TextButtonStyle();
-            buttonStyle.font = buttonFont;
-        }
+        TextButton.TextButtonStyle buttonStyle = pauseSkin.has("default", TextButton.TextButtonStyle.class)
+            ? pauseSkin.get("default", TextButton.TextButtonStyle.class)
+            : new TextButton.TextButtonStyle();
+        if (buttonStyle.font == null) buttonStyle.font = buttonFont;
 
-        // Resume Button
         TextButton resumeButton = new TextButton("RESUME", buttonStyle);
         resumeButton.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
-                isPaused = false; // Instantly unpauses on next frame
+                isPaused = false;
             }
         });
         pauseTable.add(resumeButton).width(250f).height(50f);
-        pauseTable.row();
-        pauseTable.padTop(20f);
+        pauseTable.row().padTop(20f);
 
-        // Main Menu Button
         TextButton mainMenuButton = new TextButton("MAIN MENU", buttonStyle);
         mainMenuButton.addListener(new ClickListener() {
             @Override
             public void clicked(InputEvent event, float x, float y) {
-                dispose(); // Clean up GameScreen resources
-                // Transition back to MenuScreen (AssetHub is kept alive!)
+                dispose();
                 game.setScreen(new MenuScreen(game, assetHub));
             }
         });
         pauseTable.add(mainMenuButton).width(250f).height(50f);
     }
 
+    private void onPaused(float deltaTime){
+        ScreenUtils.clear(0, 0, 0, 1f);
+
+        mapRenderer.setView(camera);
+        mapRenderer.render(groundLayers);
+
+        batch.setProjectionMatrix(camera.combined);
+        batch.begin();
+        context.getWorld().drawTextures(batch);
+        ParticleSystem.updateAndDraw(Gdx.graphics.getDeltaTime(), batch);
+        batch.end();
+
+        mapRenderer.render(foregroundLayers);
+
+        shapeRenderer.setProjectionMatrix(camera.combined);
+        shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
+        context.getWorld().draw(shapeRenderer);
+        shapeRenderer.end();
+
+        shapeRenderer.setProjectionMatrix(pauseStage.getViewport().getCamera().combined);
+        shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
+        shapeRenderer.setColor(0f, 0f, 0f, 0.75f);
+        shapeRenderer.rect(0, 0, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
+        shapeRenderer.end();
+
+        pauseStage.act(deltaTime);
+        pauseStage.draw();
+    }
+
     @Override
-    public void render(float delta) {
-        // 1. CHECK FOR PAUSE TOGGLE (Works globally, bypasses player input)
+    public void render(float deltaTime) {
+        // 1. CHECK FOR PAUSE TOGGLE
         if (Gdx.input.isKeyJustPressed(Input.Keys.ESCAPE)) {
             isPaused = !isPaused;
         }
 
-        // 2. PAUSED STATE: Freeze everything and draw overlay
+        // 2. PAUSED STATE
         if (isPaused) {
-            ScreenUtils.clear(0, 0, 0, 1f);
-
-            // Draw the game world exactly as it was (frozen in time)
-            mapRenderer.setView(camera);
-            mapRenderer.render(groundLayers);
-
-            batch.setProjectionMatrix(camera.combined);
-            batch.begin();
-            context.getWorld().drawTextures(batch);
-            ParticleSystem.updateAndDraw(Gdx.graphics.getDeltaTime(), batch);
-            batch.end();
-
-            mapRenderer.render(foregroundLayers);
-
-            shapeRenderer.setProjectionMatrix(camera.combined);
-            shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
-            context.getWorld().draw(shapeRenderer);
-            shapeRenderer.end();
-
-            // Draw semi-transparent black overlay (75% opaque) over the whole screen
-            shapeRenderer.setProjectionMatrix(pauseStage.getViewport().getCamera().combined);
-            shapeRenderer.begin(ShapeRenderer.ShapeType.Filled);
-            shapeRenderer.setColor(0f, 0f, 0f, 0.75f);
-            shapeRenderer.rect(0, 0, Gdx.graphics.getWidth(), Gdx.graphics.getHeight());
-            shapeRenderer.end();
-
-            // Draw the pause menu UI on top
-            pauseStage.act(delta);
-            pauseStage.draw();
-
-            return; // CRITICAL: Stop here! Do not update game logic while paused.
+            onPaused(deltaTime);
+            return;
         }
 
-        // 3. NORMAL GAME LOOP (Only runs if isPaused == false)
         ScreenUtils.clear(0, 0, 0, 1f);
         AnimatedTiledMapTile.updateAnimationBaseTime();
 
@@ -204,6 +190,7 @@ public class GameScreen implements Screen {
 
         GameWorld activeWorld = context.getWorld();
         activeWorld.update(Gdx.graphics.getDeltaTime());
+
 
         cameraManager.updateTracking(context);
         camera.update();
@@ -223,6 +210,21 @@ public class GameScreen implements Screen {
         shapeRenderer.begin(ShapeRenderer.ShapeType.Line);
         activeWorld.draw(shapeRenderer);
         shapeRenderer.end();
+
+        // DEBUG: Press 'H' to damage nearby enemies to test the loot drop
+        if (Gdx.input.isKeyJustPressed(Input.Keys.H)) {
+            Player p = context.getPlayer();
+            if (p != null) {
+                for (Entity entity : activeWorld.getPhysicsEntities()) {
+                    if (entity instanceof Enemy) {
+                        Enemy enemy = (Enemy) entity;
+                        if (enemy.getPosition().dst(p.getPosition()) < 2f) {
+                            enemy.takeDamage(30); // Instakill the 30 HP test enemy
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private void changeActiveMap(PortalData transition) {
@@ -230,33 +232,23 @@ public class GameScreen implements Screen {
         Player activePlayer = context.getPlayer();
 
         if (activePlayer != null) {
-            // Reset player input state
             activePlayer.setIntent(new PlayerIntent());
-
-            // 1. Detach player from old world so it can be cached cleanly
-            oldWorld.detachEntity(activePlayer);
+            // oldWorld.detachEntity(activePlayer);
         }
 
-        GameWorld targetWorld = worldCache.getOrCreateWorld(transition.targetMapPath);
-
-        // 3. Teleport player to the new map's spawn point
+        GameWorld targetWorld = worldCache.getOrCreateWorld(transition.targetMapPath, context.getItems(), context.getEffectFactory());
         activePlayer.getPosition().set(transition.targetSpawnPosition);
         activePlayer.getBounds().setPosition(activePlayer.getPosition().x, activePlayer.getPosition().y);
-
-        // 4. Add player to the new world
         targetWorld.addDynamicEntity(activePlayer);
 
-        // 5. Update Context and Renderer
         context.setWorld(targetWorld);
         context.setPlayer(activePlayer);
 
-        // 6. Swap the renderer to point to the new map
         this.mapRenderer.dispose();
         this.mapRenderer = new CustomTiledMapRenderer(targetWorld.getMap(), GameScreen.UNIT_SCALE);
         this.initMapLayers();
 
         targetWorld.clearPendingTransition();
-        System.out.println("Transition complete. Player safe position: " + activePlayer.getPosition());
     }
 
     private void initMapLayers() {
@@ -272,26 +264,19 @@ public class GameScreen implements Screen {
                 foregroundIndices.add(i);
             }
         }
-
         this.groundLayers = groundIndices.toArray();
         this.foregroundLayers = foregroundIndices.toArray();
     }
 
     @Override
     public void resize(int width, int height) {
-        // Leave the game camera alone so it stays at your 15x10 zoom level!
-
-        // Only update the Pause UI so the buttons stretch correctly if you resize the window
         if (pauseStage != null) {
             pauseStage.getViewport().update(width, height, true);
         }
     }
 
-    @Override
-    public void pause() {}
-
-    @Override
-    public void resume() {}
+    @Override public void pause() {}
+    @Override public void resume() {}
 
     @Override
     public void hide() {
@@ -306,10 +291,8 @@ public class GameScreen implements Screen {
         if (pauseStage != null) pauseStage.dispose();
         if (pauseSkin != null) pauseSkin.dispose();
         ParticleSystem.dispose();
+        if (worldCache != null) worldCache.disposeAll();
 
-        // Let the WorldCache handle disposing ALL cached worlds and their TiledMaps
-        if (worldCache != null) {
-            worldCache.disposeAll();
-        }
+        // CRITICAL FIX: DO NOT dispose of assetHub here! The MenuScreen still needs it.
     }
 }

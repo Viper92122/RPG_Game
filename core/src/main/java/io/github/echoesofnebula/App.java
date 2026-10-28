@@ -9,12 +9,10 @@ public class App extends Game {
 
     @Override
     public void create() {
-        // 1. Initialize your AssetHub and queue assets
         assetHub = new AssetHub();
         assetHub.queueInitialAssets(); // Replace with your actual loading method
 
-        // 2. Start the flow. That's it!
-        // LoadingScreen will automatically transition to MenuScreen when done.
+
         setScreen(new LoadingScreen(this, assetHub));
     }
 

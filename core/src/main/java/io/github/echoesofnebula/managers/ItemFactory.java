@@ -1,109 +1,60 @@
-package io.github.echoesofnebula.managers;
+package io.github.echoesofnebula.items;
 
 import com.badlogic.gdx.graphics.g2d.Animation;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
-import com.badlogic.gdx.utils.Array;
-
-import io.github.echoesofnebula.items.ConsumableItem;
-import io.github.echoesofnebula.items.Item;
-import io.github.echoesofnebula.items.ItemEffect;
+import io.github.echoesofnebula.managers.AssetHub;
+import io.github.echoesofnebula.managers.ItemEffectFactory;
+import io.github.echoesofnebula.managers.ItemRegistry;
 import io.github.echoesofnebula.view.GameScreen;
 
-/**
- * Central factory for creating all items in the game.
- * Add new items here as your game grows!
- */
 public class ItemFactory {
-
     private final AssetHub assetHub;
+    private final ItemRegistry itemRegistry;
+    private final ItemEffectFactory effectFactory;
 
-    // Default render size (in pixels) - adjust per item if needed
-    private static final float DEFAULT_RENDER_SIZE_PX = 5f;
-
-    public ItemFactory(AssetHub assetHub) {
+    public ItemFactory(AssetHub assetHub, ItemRegistry itemRegistry, ItemEffectFactory effectFactory) {
         this.assetHub = assetHub;
+        this.itemRegistry = itemRegistry;
+        this.effectFactory = effectFactory;
     }
 
     public Item createItem(String itemName, float worldX, float worldY) {
-        System.out.println("🏭 ItemFactory creating: '" + itemName + "'");
-
-        float renderW = DEFAULT_RENDER_SIZE_PX * GameScreen.UNIT_SCALE;
-        float renderH = DEFAULT_RENDER_SIZE_PX * GameScreen.UNIT_SCALE;
-
-        System.out.println("   Render size: " + renderW + "x" + renderH + " world units");
-
-        switch (itemName.toLowerCase()) {
-            case "health_potion":
-            case "healingitem":
-                return createHealthPotion(worldX, worldY, 5, 5);
-
-            default:
-                System.err.println("❌ Unknown item type: " + itemName);
-                return null;
-        }
-    }
-
-    private ConsumableItem createHealthPotion(float x, float y, float w, float h) {
-        System.out.println("   Fetching texture: 'healthPotion'");
-        TextureRegion tex = assetHub.getRegion("healthPotion");
-
-        if (tex == null) {
-            System.err.println("❌ ERROR: Texture 'healthPotion' not found in AssetHub!");
+        // 1. Look up blueprint
+        ItemBlueprint blueprint = itemRegistry.get(itemName);
+        if (blueprint == null) {
+            System.err.println("❌ Unknown item type: " + itemName);
             return null;
         }
 
-        ItemEffect effect = ItemEffectFactory.createEffect("HEAL", 50f);
+        // 2. Convert pixel sizes to world units
+        float renderW = blueprint.renderWidth * GameScreen.UNIT_SCALE;
+        float renderH = blueprint.renderHeight * GameScreen.UNIT_SCALE;
 
-        float customRenderW = 6f * GameScreen.UNIT_SCALE; // Adjust this value!
-        float customRenderH = 6f * GameScreen.UNIT_SCALE; // Adjust this value!
+        // 3. Resolve visuals cleanly (NO instanceof, NO Object casting)
+        Animation<TextureRegion> anim = null;
+        TextureRegion tex = null;
 
-        int frameWidth = 24;
-        int frameHeight = 39;
-
-        boolean isAnimationStrip = tex.getRegionWidth() > frameWidth;
-
-        if (isAnimationStrip) {
-            System.out.println("   🎞️ Detected animation strip! Slicing into frames...");
-
-            int totalFrames = tex.getRegionWidth() / frameWidth;
-
-            Array<TextureRegion> frames = new Array<>();
-            for (int i = 0; i < totalFrames; i++) {
-                int frameX = tex.getRegionX() + (i * frameWidth);
-                int frameY = tex.getRegionY();
-
-                TextureRegion frame = new TextureRegion(
-                    tex.getTexture(),
-                    frameX,
-                    frameY,
-                    frameWidth,
-                    frameHeight
-                );
-                frames.add(frame);
-            }
-
-            Animation<TextureRegion> anim = new Animation<>(0.1f, frames, Animation.PlayMode.LOOP);
-
-            // Use custom render dimensions instead of the passed w/h
-            return new ConsumableItem("Health Potion", x, y, customRenderW, customRenderH, effect, anim);
-
-        } else {
-            System.out.println("   🖼️ Static texture detected");
-            return new ConsumableItem("Health Potion", x, y, customRenderW, customRenderH, effect, tex);
+        if (blueprint.isAnimated) {
+            anim = assetHub.getAnimation(blueprint.atlasKey, blueprint.frameDuration);
         }
-    }
 
-    private ConsumableItem createManaPotion(float x, float y, float w, float h) {
-        TextureRegion tex = assetHub.getRegion("manaPotion"); // You'd add this to your atlas
-        if (tex == null) return null;
-        ItemEffect effect = ItemEffectFactory.createEffect("RESTORE_MANA", 30f);
-        return new ConsumableItem("Mana Potion", x, y, w, h, effect, tex);
-    }
+        // If it's not animated, or animation failed to load, fall back to static texture
+        if (anim == null) {
+            tex = assetHub.getRegion(blueprint.atlasKey);
+            if (tex == null) {
+                System.err.println("❌ Could not find visual for: " + blueprint.atlasKey);
+                return null;
+            }
+        }
 
-    private ConsumableItem createStrengthElixir(float x, float y, float w, float h) {
-        TextureRegion tex = assetHub.getRegion("strengthElixir");
-        if (tex == null) return null;
-        ItemEffect effect = ItemEffectFactory.createEffect("BUFF_STRENGTH", 25f);
-        return new ConsumableItem("Strength Elixir", x, y, w, h, effect, tex);
+        // 4. Create the item (Only 2 branches now: Consumable vs Regular)
+        if (blueprint.isConsumable) {
+            ItemEffect effect = effectFactory.createEffect(blueprint.effectType, blueprint.intensity);
+            return new ConsumableItem(blueprint.displayName, worldX, worldY, renderW, renderH,
+                effect, tex, anim, blueprint);
+        } else {
+            return new Item(blueprint.displayName, worldX, worldY, renderW, renderH,
+                blueprint,tex, anim);
+        }
     }
 }

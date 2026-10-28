@@ -6,19 +6,14 @@ import io.github.echoesofnebula.core.GameWorld;
 public class WorldCache {
     private final ObjectMap<String, GameWorld> loadedWorlds = new ObjectMap<>();
     private final AssetHub assetHub;
-
     public WorldCache(AssetHub assetHub) {
         this.assetHub = assetHub;
     }
-    public GameWorld getOrCreateWorld(String mapPath) {
+    public GameWorld getOrCreateWorld(String mapPath, ItemRegistry itemRegistry, ItemEffectFactory effectFactory) {
         if (loadedWorlds.containsKey(mapPath)) {
-            System.out.println("Retrieving cached world state for: " + mapPath);
             return loadedWorlds.get(mapPath);
         }
-
-        System.out.println("First time visiting map. Generating fresh simulation for: " + mapPath);
-
-        GameWorld freshWorld = new GameWorld(mapPath, assetHub);
+        GameWorld freshWorld = new GameWorld(mapPath, assetHub, itemRegistry, effectFactory); // ✅ UPDATED
         loadedWorlds.put(mapPath, freshWorld);
         return freshWorld;
     }

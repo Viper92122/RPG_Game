@@ -3,49 +3,35 @@ package io.github.echoesofnebula.items;
 import com.badlogic.gdx.graphics.g2d.Animation;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
-import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import io.github.echoesofnebula.core.GameWorld;
-import io.github.echoesofnebula.core.UpdateAble;
-import io.github.echoesofnebula.core.SpriteRenderable;
 import io.github.echoesofnebula.entities.Entity;
 import io.github.echoesofnebula.events.CollisionEventData;
-import io.github.echoesofnebula.view.GameScreen;
 
-public class Item extends Entity implements UpdateAble, SpriteRenderable {
+public class Item extends Entity   {
     private final String itemName;
     private boolean isCollected = false;
     private float stateTime = 0f;
-
-    private final float renderWidth;
-    private final float renderHeight;
-
+    protected ItemBlueprint blueprint;
     protected Animation<TextureRegion> animation;
     protected TextureRegion staticTexture;
 
-    public Item(String itemName, float x, float y, float width, float height, TextureRegion texture) {
-        this(itemName, x, y, width, height);
-        this.staticTexture = texture;
-    }
+    protected float width, height;
 
-    public Item(String itemName, float x, float y, float width, float height, Animation<TextureRegion> animation) {
-        this(itemName, x, y, width, height);
-        this.animation = animation;
-    }
-
-    private Item(String itemName, float x, float y, float width, float height) {
+    public Item(String itemName, float startX, float startY, float width, float height, ItemBlueprint blueprint){
         this.itemName = itemName;
-        this.getPosition().set(x, y);
-        this.renderWidth = width;
-        this.renderHeight = height;
-
-        // Auto-center a tight 8x8 pixel collection hitbox safely at the base floor
-        float hitboxWidth = 8f * GameScreen.UNIT_SCALE;
-        float hitboxHeight = 8f * GameScreen.UNIT_SCALE;
-        float offsetX = (renderWidth - hitboxWidth) / 2f;
-        float offsetY = 0f;
-
-        this.getBounds().set(x + offsetX, y + offsetY, hitboxWidth, hitboxHeight);
+        this.pos.set(startX, startY);
+        this.bounds.set(startX, startY, width, height);
+        this.width = width;
+        this.height = height;
+        this.blueprint = blueprint;
     }
+    public Item(String itemName, float startX, float startY, float width, float height,ItemBlueprint blueprint,
+                TextureRegion texture, Animation<TextureRegion> animation) {
+        this(itemName, startX, startY, width, height, blueprint);
+        this.staticTexture = texture;       // Will be null if animated
+        this.animation = animation;   // Will be null if static
+    }
+
 
     @Override
     public void update(float deltaTime) {
@@ -53,7 +39,6 @@ public class Item extends Entity implements UpdateAble, SpriteRenderable {
         this.stateTime += deltaTime;
     }
 
-    private boolean hasLoggedFrame = false; // Add this to the top fields of Item.java
 
     @Override
     public void drawTextures(SpriteBatch batch) {
@@ -62,26 +47,13 @@ public class Item extends Entity implements UpdateAble, SpriteRenderable {
         TextureRegion currentFrame = (animation != null) ? animation.getKeyFrame(stateTime, true) : staticTexture;
 
         if (currentFrame != null) {
-            // 🔍 RUNTIME RENDERING TRACKER LOG
-            if (!hasLoggedFrame && animation != null) {
-                System.out.println("📺 RUNTIME DRAW CHECK for [" + itemName + "]:");
-                System.out.println("   -> Target Draw Dimensions on Canvas: " + renderWidth + "x" + renderHeight);
-                System.out.println("   -> Active Frame Region Dimensions: " + currentFrame.getRegionWidth() + "x" + currentFrame.getRegionHeight());
-                hasLoggedFrame = true;
-            }
+
 
             float bobbingY = (float) Math.sin(stateTime * 3.0f) * 0.04f;
-            batch.draw(currentFrame, getPosition().x, getPosition().y + bobbingY, renderWidth, renderHeight);
+            batch.draw(currentFrame, getPosition().x, getPosition().y + bobbingY, width, height);
         }
     }
 
-    @Override
-    public void drawShapes(ShapeRenderer shapeRenderer) {
-        if (!isCollected) {
-            shapeRenderer.setColor(0, 1, 0, 1);
-            shapeRenderer.rect(getBounds().x, getBounds().y, getBounds().width, getBounds().height);
-        }
-    }
 
     @Override
     public void acceptCollision(GameWorld world, CollisionEventData event) {
@@ -93,4 +65,15 @@ public class Item extends Entity implements UpdateAble, SpriteRenderable {
     public String getItemName() { return itemName; }
     public boolean isCollected() { return isCollected; }
     public void collect() { this.isCollected = true; }
+    public void onCollectedBy(Entity collector, GameWorld world) {
+        collector.pickupItem(this, world);
+        world.removeEntity(this);
+    }
+    public void interactWith(Entity entity, GameWorld world) {
+        System.out.println("Interacted with persistent entity: " + this.getItemName());
+    }
+
+    public ItemBlueprint getBlueprint() {
+        return blueprint;
+    }
 }

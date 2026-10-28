@@ -61,7 +61,6 @@ public class ParticleSystem {
         for (int i = activeEffects.size - 1; i >= 0; i--) {
             PooledEffect effect = activeEffects.get(i);
 
-
             effect.update(deltaTime);
             effect.draw(batch);
 

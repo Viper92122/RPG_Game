@@ -1,7 +1,5 @@
 package io.github.echoesofnebula.core;
 
-import com.badlogic.gdx.Gdx;
-import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.g2d.Animation;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureAtlas.AtlasRegion;
@@ -19,157 +17,288 @@ import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.ObjectMap;
 
-import io.github.echoesofnebula.ai.AIBehavior;
-import io.github.echoesofnebula.ai.EnemyBrain;
 import io.github.echoesofnebula.entities.Enemy;
 import io.github.echoesofnebula.entities.Entity;
 import io.github.echoesofnebula.entities.Player;
 import io.github.echoesofnebula.environment.SolidObstacle;
 import io.github.echoesofnebula.events.CollisionEventData;
-import io.github.echoesofnebula.items.MapEntityFactory;
-import io.github.echoesofnebula.managers.EnemyFactory;
-import io.github.echoesofnebula.managers.ItemEffectFactory;
-import io.github.echoesofnebula.items.ItemEffect;
 import io.github.echoesofnebula.items.ConsumableItem;
 import io.github.echoesofnebula.items.Item;
-import io.github.echoesofnebula.managers.ItemFactory;
-import io.github.echoesofnebula.view.GameScreen;
+import io.github.echoesofnebula.items.ItemFactory;
+import io.github.echoesofnebula.managers.ItemEffectFactory;
+import io.github.echoesofnebula.managers.ItemRegistry;
+import io.github.echoesofnebula.managers.MapEntityFactory;
+import io.github.echoesofnebula.managers.EnemyFactory;
+import io.github.echoesofnebula.ai.AIBehavior;
 import io.github.echoesofnebula.managers.AssetHub;
+import io.github.echoesofnebula.view.GameScreen;
 
 public class GameWorld {
     private TiledMap map;
-    private Array<UpdateAble> updateables;
     private Array<Entity> physicsEntities;
     private Vector2 mapDimensions;
 
-    private final AssetHub assetHub;
-    private final ItemFactory itemFactory;
-    private final EnemyFactory enemyFactory;
     private static final float FALLBACK_OFFSET_METERS = 10f;
     private final Array<Entity> entitiesToRemove = new Array<>();
     private final ObjectMap<Rectangle, PortalData> portals = new ObjectMap<>();
     private PortalData pendingTransition = null;
     private PortalData activePortalUnderPlayer = null;
     private Player player;
-    public GameWorld(String initialMapPath, AssetHub assetHub) {
-        this.assetHub = assetHub;
-        itemFactory = new ItemFactory(assetHub);
-        enemyFactory = new EnemyFactory(assetHub);
-        init(initialMapPath);
+    private final ItemFactory itemFactory;
+    private final EnemyFactory enemyFactory;
+
+    public GameWorld(String initialMapPath, AssetHub assetHub, ItemRegistry itemRegistry,
+                     ItemEffectFactory effectFactory) {
+        this.itemFactory = new ItemFactory(assetHub, itemRegistry, effectFactory);
+        this.enemyFactory = new EnemyFactory(assetHub);
+
+        init(initialMapPath, assetHub);
     }
 
-    public void spawnItemByName(String itemName, float x, float y) {
-        Item item = itemFactory.createItem(itemName, x, y);
-        if (item != null) this.addDynamicEntity(item);
-    }
-    private void init(String initialMapPath) {
-        updateables = new Array<>();
+    private void init(String initialMapPath, AssetHub assetHub) {
         physicsEntities = new Array<>();
-
-        // 1. Try to get the asynchronously loaded map first
-        this.map = assetHub.getMap(initialMapPath);
-
-        // 2. Fallback for dynamic maps not pre-queued (prevents crashes during portal transitions)
-        if (this.map == null) {
-            System.out.println("⚠️ Map not pre-loaded, loading synchronously (may cause minor hitch): " + initialMapPath);
-            this.map = new TmxMapLoader().load(initialMapPath);
-        }
+        map = new TmxMapLoader().load(initialMapPath);
 
         MapProperties prop = getMap().getProperties();
         float width = prop.get("width", Integer.class) * prop.get("tilewidth", Integer.class);
         float height = prop.get("height", Integer.class) * prop.get("tileheight", Integer.class);
-
         mapDimensions = new Vector2(width * GameScreen.UNIT_SCALE, height * GameScreen.UNIT_SCALE);
 
         loadCollisionBoundariesFromMap();
-        loadEntitiesFromMap(assetHub, "Items", "healingItem", (tileObj, atlasKey, x, y, w, h, region, anim) -> {
-            boolean isConsumable = !tileObj.getProperties().containsKey("consumable") ||
-                ((Boolean) tileObj.getProperties().get("consumable"));
 
-            if (isConsumable) {
-                String actionType = tileObj.getProperties().containsKey("action_type") ?
-                    tileObj.getProperties().get("action_type", String.class) : "HEAL";
-                float intensity = tileObj.getProperties().containsKey("intensity") ?
-                    ((Number) tileObj.getProperties().get("intensity")).floatValue() : 50f;
+        // ✅ Beautifully simple - just pass name and position!
+        loadEntitiesFromMap(assetHub, "Items", "healingItem",
+            (tileObj, atlasKey, x, y, w, h) -> {
+                return itemFactory.createItem(atlasKey, x, y);
+            });
 
-                ItemEffect concreteEffect = ItemEffectFactory.createEffect(actionType, intensity);
-
-                // 🌟 CHECK: Double check that 'w' and 'h' are passed to ConsumableItem!
-                return (anim != null) ?
-                    new ConsumableItem(atlasKey, x, y, w, h, concreteEffect, anim) :
-                    new ConsumableItem(atlasKey, x, y, w, h, concreteEffect, region);
-
-            } else {
-                return (anim != null) ?
-                    new Item(atlasKey, x, y, w, h, anim) :
-                    new Item(atlasKey, x, y, w, h, region);
-            }
-        });
         loadPortalsFromMap();
     }
 
-    public void spawnTestEnemy(String type, float x, float y) {
+    public TiledMap getMap() { return map; }
+    public Vector2 getMapDimensions() { return mapDimensions; }
+    public Player getPlayer() { return player; }
+    public PortalData getPendingTransition() { return pendingTransition; }
+    public void clearPendingTransition() { this.pendingTransition = null; }
+    public Array<Entity> getPhysicsEntities() { return physicsEntities; }
 
-        AIBehavior simpleAI = new EnemyBrain(player);
 
-        Enemy enemy = enemyFactory.createEnemy(type, x, y, simpleAI);
-        this.addDynamicEntity(enemy);
-        System.out.println("Spawned test enemy: " + type + " at (" + x + ", " + y + ")");
-    }
-
-    public void detachEntity(Entity entity) {
-        this.physicsEntities.removeValue(entity, true);
-        if (entity instanceof UpdateAble) {
-            this.updateables.removeValue((UpdateAble) entity, true);
-        }
-    }
-
-    public TiledMap getMap() {
-        return map;
-    }
-
-    public Vector2 getMapDimensions() {
-        return mapDimensions;
-    }
-
-    public Player getPlayer() {
-        return player;
-    }
-
-    public PortalData getPendingTransition() {
-        return pendingTransition;
-    }
-
-    public void clearPendingTransition() {
-        this.pendingTransition = null;
-    }
-
-    public void spawnPlayer(AssetHub assetHub, float x, float y) {
-        this.player = new Player(x, y, assetHub);
+    public void spawnPlayer(AssetHub assetHub, float x, float y, ItemEffectFactory effectFactory) {
+        this.player = new Player(x, y, assetHub, effectFactory);
         addDynamicEntity(player);
-    }
-
-    public void spawnEnemy(String type, float x, float y, AIBehavior ai) {
-        Enemy enemy = enemyFactory.createEnemy(type, x, y, ai);
-        this.addDynamicEntity(enemy);
     }
 
     public void addStaticEntity(Entity entity) {
         physicsEntities.add(entity);
     }
 
-    public <T extends Entity & UpdateAble> void addDynamicEntity(T dynamicEntity) {
+    public void addDynamicEntity(Entity dynamicEntity) {
         physicsEntities.add(dynamicEntity);
-        updateables.add(dynamicEntity);
-
         if (dynamicEntity instanceof Player) {
             this.player = (Player) dynamicEntity;
         }
     }
 
     public void removeEntity(Entity entity) {
-
         entitiesToRemove.add(entity);
+    }
+
+    /**
+     * Safely removes an entity from the world's lists.
+     * Used when transitioning maps so the old world can be cached cleanly.
+     */
+    public void detachEntity(Entity entity) {
+        physicsEntities.removeValue(entity, true);
+        entitiesToRemove.removeValue(entity, true);
+    }
+
+    // --- FACTORY-BASED SPAWNING ---
+
+    /**
+     * Spawns an enemy using the EnemyFactory.
+     * The factory handles Stats, LootTable, and Animations automatically.
+     */
+    public void spawnEnemy(String type, float x, float y, AIBehavior aiBehavior) {
+        Enemy enemy = enemyFactory.createEnemy(type, x, y, aiBehavior);
+        this.addDynamicEntity(enemy);
+        System.out.println("✨ Spawned enemy '" + type + "' at (" + x + ", " + y + ")");
+    }
+
+    /**
+     * Convenience method for quick testing (defaults to test_slime)
+     */
+    public void spawnTestEnemy(float x, float y) {
+        AIBehavior simpleAI = new AIBehavior() {
+            @Override
+            public void update(Enemy enemy, float deltaTime) {
+                if (Math.random() < 0.02f) {
+                    float randomX = (float)(Math.random() * 2 - 1);
+                    float randomY = (float)(Math.random() * 2 - 1);
+                    enemy.getVelocity().set(randomX, randomY).scl(enemy.getStats().getMoveSpeed());
+                }
+            }
+            @Override
+            public void handleWallImpact(Enemy enemy) {
+                enemy.getVelocity().scl(-1);
+            }
+        };
+        spawnEnemy("test_slime", x, y, simpleAI);
+    }
+
+    /**
+     * Spawns any item by name using the ItemFactory.
+     * Used for loot drops, chest rewards, etc.
+     */
+    public void spawnItemByName(String itemName, float worldX, float worldY) {
+        System.out.println("🔍 Attempting to spawn item: '" + itemName + "' at (" + worldX + ", " + worldY + ")");
+
+        Item item = itemFactory.createItem(itemName, worldX, worldY);
+
+        if (item == null) {
+            System.err.println("❌ ERROR: ItemFactory returned null for '" + itemName + "'!");
+            return;
+        }
+
+        this.addDynamicEntity(item);
+        System.out.println("✨ Spawned item: " + item.getItemName());
+    }
+
+    // --- MAIN UPDATE LOOP (Polymorphic, no instanceof!) ---
+
+    public void update(float deltaTime) {
+        // 1. Update all entities and run physics
+        int physicsSize = this.physicsEntities.size;
+        for (int i = 0; i < physicsSize; i++) {
+            Entity entity = this.physicsEntities.get(i);
+
+            // Polymorphism: each entity decides how to update itself
+            entity.update(deltaTime);
+
+            if (entity.getVelocity().x != 0 || entity.getVelocity().y != 0) {
+                simulatePhysicsAndCollisions(deltaTime, entity);
+            }
+        }
+
+        // 2. Let every entity check its own state (death, expiration, etc.)
+        // No more checkEnemyDeaths() with instanceof!
+        for (int i = physicsEntities.size - 1; i >= 0; i--) {
+            physicsEntities.get(i).checkState(this);
+        }
+
+        // 3. Remove entities flagged for removal
+        int removeSize = this.entitiesToRemove.size;
+        if (removeSize > 0) {
+            for (int i = 0; i < removeSize; i++) {
+                Entity e = this.entitiesToRemove.get(i);
+                System.out.println(e.getClass().getSimpleName() + " being removed");
+                this.physicsEntities.removeValue(e, true);
+            }
+            this.entitiesToRemove.clear();
+        }
+    }
+
+    // --- PHYSICS & COLLISIONS ---
+
+    private void simulatePhysicsAndCollisions(float deltaTime, Entity entity) {
+        float safeBoundsX = entity.getBounds().x;
+        float safePosX = entity.getPosition().x;
+        entity.getBounds().x += entity.getVelocity().x * deltaTime;
+        Entity hitTargetX = checkEntityCollisions(entity);
+
+        if (hitTargetX != null) {
+            entity.getBounds().x = safeBoundsX;
+            entity.getPosition().x = safePosX;
+            onCollisionTriggered(new CollisionEventData(entity, hitTargetX, safePosX, entity.getPosition().y, true));
+        } else {
+            entity.getPosition().x += entity.getVelocity().x * deltaTime;
+        }
+
+        float safeBoundsY = entity.getBounds().y;
+        float safePosY = entity.getPosition().y;
+        entity.getBounds().y += entity.getVelocity().y * deltaTime;
+        Entity hitTargetY = checkEntityCollisions(entity);
+
+        if (hitTargetY != null) {
+            entity.getBounds().y = safeBoundsY;
+            entity.getPosition().y = safePosY;
+            onCollisionTriggered(new CollisionEventData(entity, hitTargetY, entity.getPosition().x, safePosY, false));
+        } else {
+            entity.getPosition().y += entity.getVelocity().y * deltaTime;
+        }
+    }
+
+    public Entity checkEntityCollisions(Entity movingEntity) {
+        for (Entity staticEntity : physicsEntities) {
+            if (staticEntity == movingEntity) continue;
+            if (movingEntity.getBounds().overlaps(staticEntity.getBounds())) {
+                return staticEntity;
+            }
+        }
+        return null;
+    }
+
+    private void onCollisionTriggered(CollisionEventData event) {
+        event.initiator.acceptCollision(this, event);
+        event.target.acceptCollision(this, event);
+    }
+
+    // --- COLLISION HANDLERS ---
+
+    public void handleSolidObstacleCollision(SolidObstacle obstacle, CollisionEventData event) {
+        if (event.isXAxis) {
+            event.initiator.getPosition().x = event.safeX;
+        } else {
+            event.initiator.getPosition().y = event.safeY;
+        }
+        event.initiator.getBounds().setPosition(event.initiator.getPosition().x, event.initiator.getPosition().y);
+    }
+
+    public void handlePlayerCollision(Player player, CollisionEventData event) {
+        if (event.isXAxis) {
+            event.initiator.getPosition().x = event.safeX;
+        } else {
+            event.initiator.getPosition().y = event.safeY;
+        }
+        // System.out.println(player.toString() + " collided with: " + event.target.toString());
+    }
+
+    public void handleEnemyCollision(Enemy enemy, CollisionEventData event) {
+        if (event.isXAxis) {
+            enemy.getPosition().x = event.safeX;
+        } else {
+            enemy.getPosition().y = event.safeY;
+        }
+        enemy.getBounds().setPosition(enemy.getPosition().x, enemy.getPosition().y);
+        enemy.handleWallImpact();
+    }
+
+    public void handleItemCollision(Item item, CollisionEventData event) {
+        item.onCollectedBy(event.initiator, this);
+    }
+
+    public void drawTextures(SpriteBatch batch) {
+        int physicsSize = physicsEntities.size;
+        for (int i = 0; i < physicsSize; i++) {
+            Entity entity = physicsEntities.get(i);
+            // Skip pure collision boxes - their drawTextures() is a no-op
+            if (entity instanceof SolidObstacle) continue;
+
+            entity.drawTextures(batch);
+        }
+    }
+
+    public void draw(ShapeRenderer shapeRenderer) {
+        // Polymorphism: each entity draws its own debug shape
+        for (int i = 0; i < physicsEntities.size; i++) {
+            physicsEntities.get(i).drawShapes(shapeRenderer);
+        }
+
+        shapeRenderer.setColor(com.badlogic.gdx.graphics.Color.CYAN);
+        for (Rectangle portalRect : portals.keys()) {
+            float w = portalRect.width > 0 ? portalRect.width : 32f;
+            float h = portalRect.height > 0 ? portalRect.height : 32f;
+            shapeRenderer.rect(portalRect.x, portalRect.y, w, h);
+        }
     }
 
     private void loadPortalsFromMap() {
@@ -186,13 +315,13 @@ public class GameWorld {
                 MapProperties props = object.getProperties();
 
                 if (!props.containsKey("targetMap")) {
-                    System.err.println("Warning: Portal shape at " + rect.x + "," + rect.y + " is missing targetMap attributes.");
+                    System.err.println("Warning: Portal at " + rect.x + "," + rect.y + " missing targetMap.");
                     continue;
                 }
 
                 String targetMap = props.get("targetMap", String.class);
-                float targetX = 64f * GameScreen.UNIT_SCALE;
-                float targetY = 64f * GameScreen.UNIT_SCALE;
+                float targetX = 64f;
+                float targetY = 64f;
 
                 if (props.containsKey("targetX")) {
                     Object xObj = props.get("targetX");
@@ -216,20 +345,20 @@ public class GameWorld {
         for (MapObject object : layer.getObjects()) {
             if (object instanceof RectangleMapObject) {
                 Rectangle rect = ((RectangleMapObject) object).getRectangle();
-
-                // FIX: Extract primitive values first to prevent compounding scale calculations
                 float scaledX = rect.x * GameScreen.UNIT_SCALE;
                 float scaledY = rect.y * GameScreen.UNIT_SCALE;
                 float scaledW = rect.width * GameScreen.UNIT_SCALE;
                 float scaledH = rect.height * GameScreen.UNIT_SCALE;
-
                 SolidObstacle obstacle = new SolidObstacle(scaledX, scaledY, scaledW, scaledH);
                 this.addStaticEntity(obstacle);
             }
         }
     }
+
     @SuppressWarnings({"SameParameterValue", "unused"})
-    private <T extends Entity & UpdateAble> void loadEntitiesFromMap(AssetHub assetHub, String layerName, String defaultAtlasKey, MapEntityFactory<T> factory) {
+    private <T extends Entity> void loadEntitiesFromMap(
+        AssetHub assetHub, String layerName, String defaultAtlasKey, MapEntityFactory<T> factory) {
+
         MapLayer layer = map.getLayers().get(layerName);
         if (layer == null) {
             System.out.println("⚠️ WARNING: Map layer '" + layerName + "' not found.");
@@ -240,52 +369,30 @@ public class GameWorld {
 
         for (MapObject object : layer.getObjects()) {
             if (!(object instanceof TiledMapTileMapObject)) continue;
-
             TiledMapTileMapObject tileObj = (TiledMapTileMapObject) object;
-            tileObj.setTile(null); // Decouple from Tiled default renderer
+            tileObj.setTile(null);
 
-            // 1. Resolve key names and fetch textures
             String atlasKey = resolveAtlasKey(tileObj, defaultAtlasKey);
             AtlasRegion primaryRegion = assetHub.getRegion(atlasKey);
-
             if (primaryRegion == null) {
-                System.err.println("❌ ERROR: AssetHub lacks mapping region trace token: " + atlasKey);
+                System.err.println("❌ ERROR: AssetHub lacks region: " + atlasKey);
                 continue;
             }
 
-            // 2. Parse frame dimensions and map coordinates
-            // 2. Parse frame dimensions (used strictly for slicing the sprite sheet)
             int frameW = getFrameWidth(tileObj, primaryRegion);
-            int frameH = getFrameHeight(tileObj, primaryRegion);
-
-// 3. Parse render dimensions (used for drawing the item on screen)
-// This allows you to make the potion visually smaller than its actual sprite sheet size!
-            float renderW = tileObj.getProperties().containsKey("render_width") ?
-                ((Number) tileObj.getProperties().get("render_width")).floatValue() : (float) frameW;
-
-            float renderH = tileObj.getProperties().containsKey("render_height") ?
-                ((Number) tileObj.getProperties().get("render_height")).floatValue() : (float) frameH;
-
-            float scaledW = renderW * GameScreen.UNIT_SCALE;
-            float scaledH = renderH * GameScreen.UNIT_SCALE;
-
+            int frameH = primaryRegion.originalHeight;
+            float scaledW = frameW * GameScreen.UNIT_SCALE;
+            float scaledH = frameH * GameScreen.UNIT_SCALE;
             float x = tileObj.getX() * GameScreen.UNIT_SCALE;
-            float y = (tileObj.getY() * GameScreen.UNIT_SCALE) - scaledH; // Anchors to the bottom
+            float y = (tileObj.getY() * GameScreen.UNIT_SCALE) - scaledH;
 
-            // 3. Build animation if needed
-            Array<AtlasRegion> indexedRegions = assetHub.getRegions(atlasKey);
-            Animation<TextureRegion> anim = createAnimation(tileObj, primaryRegion, indexedRegions, frameW, frameH);
-
-            // 4. Instantiate & register the generic entity
-            T entity = factory.create(tileObj, atlasKey, x, y, scaledW, scaledH, primaryRegion, anim);
+            T entity = factory.create(tileObj, atlasKey, x, y, scaledW, scaledH);
             if (entity != null) {
                 this.addDynamicEntity(entity);
             }
         }
         System.out.println("--- 📦 Layer [" + layerName + "] Loading Sequence Finished ---\n");
     }
-
-    // --- PRIVATE HELPERS ---
 
     private String resolveAtlasKey(TiledMapTileMapObject tileObj, String defaultKey) {
         String key = tileObj.getName();
@@ -295,200 +402,19 @@ public class GameWorld {
         return (key == null || key.trim().isEmpty()) ? defaultKey : key;
     }
 
-
     private int getFrameWidth(TiledMapTileMapObject tileObj, AtlasRegion region) {
-        // ALWAYS check for explicit frame_width first
         if (tileObj.getProperties().containsKey("frame_width")) {
             return ((Number) tileObj.getProperties().get("frame_width")).intValue();
         }
-        // Fallback logic...
-        return region.getRegionWidth();
-    }
-
-    private int getFrameHeight(TiledMapTileMapObject tileObj, AtlasRegion region) {
-        // 1. If an explicit frame_height custom property exists, prioritize it
-        if (tileObj.getProperties().containsKey("frame_height")) {
-            return ((Number) tileObj.getProperties().get("frame_height")).intValue();
+        boolean isStrip = region.originalWidth > region.originalHeight;
+        if (isStrip && tileObj.getProperties().containsKey("width")) {
+            return ((Number) tileObj.getProperties().get("width")).intValue();
         }
-        // 2. Fallback to Tiled object's height property if available
-        if (tileObj.getProperties().containsKey("height")) {
-            return ((Number) tileObj.getProperties().get("height")).intValue();
-        }
-        // 3. Static fallback boundary
-        return region.originalHeight;
-    }
-
-    private Animation<TextureRegion> createAnimation(
-        TiledMapTileMapObject tileObj,
-        AtlasRegion primaryRegion,
-        Array<AtlasRegion> indexedRegions,
-        int frameW, int frameH) {
-
-        String entityName = tileObj.getName() != null ? tileObj.getName() : "Unnamed (" + primaryRegion.name + ")";
-        boolean isIndexed = indexedRegions != null && indexedRegions.size > 1;
-
-        // 🌟 NEW: Calculate total frames based on a grid (handles horizontal, vertical, AND grid sheets)
-        int totalFrames = (primaryRegion.getRegionWidth() / frameW) * (primaryRegion.getRegionHeight() / frameH);
-
-        System.out.println("🔍 Scanning Asset [" + entityName + "]:");
-        System.out.println("   -> Atlas Region Size: [" + primaryRegion.getRegionWidth() + "x" + primaryRegion.getRegionHeight() + "]");
-        System.out.println("   -> Target Frame Size: [" + frameW + "x" + frameH + "]");
-        System.out.println("   -> Calculated Total Frames: " + totalFrames);
-        System.out.println("   -> isIndexed: " + isIndexed);
-
-        if (!isIndexed && totalFrames <= 1) {
-            System.out.println("   -> ⏸️ Static Item Detected (1 frame). No animation compiled.");
-            return null;
-        }
-
-        float duration = tileObj.getProperties().containsKey("frame_duration") ?
-            ((Number) tileObj.getProperties().get("frame_duration")).floatValue() : 0.1f;
-
-        Array<TextureRegion> frames = new Array<>();
-
-        if (isIndexed) {
-            System.out.println("   -> 🎞️ Compilation: Multi-file Indexed Sequence found.");
-            for (AtlasRegion r : indexedRegions) {
-                frames.add(r);
-            }
-        } else {
-            System.out.println("   -> 🎞️ Compilation: Sprite Sheet detected. Slicing into " + totalFrames + " frames.");
-
-            int cols = primaryRegion.getRegionWidth() / frameW;
-            int rows = primaryRegion.getRegionHeight() / frameH;
-
-            for (int row = 0; row < rows; row++) {
-                for (int col = 0; col < cols; col++) {
-                    int frameX = primaryRegion.getRegionX() + (col * frameW);
-                    int frameY = primaryRegion.getRegionY() + (row * frameH);
-
-                    TextureRegion individualFrame = new TextureRegion(
-                        primaryRegion.getTexture(),
-                        frameX,
-                        frameY,
-                        frameW,
-                        frameH
-                    );
-                    frames.add(individualFrame);
-                }
-            }
-        }
-
-        System.out.println("   -> ⚡ Animation built successfully with " + frames.size + " frames at " + duration + "s per frame.");
-        return frames.size > 0 ? new Animation<>(duration, frames, Animation.PlayMode.LOOP) : null;
-    }
-    public void update(float deltaTime) {
-
-        if (Gdx.input.isKeyJustPressed(Input.Keys.H)) {
-                for (Entity entity : this.physicsEntities) {
-                    if (entity instanceof Enemy) {
-                        Enemy enemy = (Enemy) entity;
-                        float distance = enemy.getPosition().dst(player.getPosition());
-                        if (distance < 2f) { // Within 2 units
-                            enemy.takeDamage(10);
-                            System.out.println("Hit enemy! HP: " + enemy.getStats().getCurrentHealth());
-                        }
-                    }
-                }
-        }
-
-        int updatableSize = this.updateables.size;
-        for (int i = 0; updatableSize > i; i++) { // Rewritten without less-than symbol!
-            this.updateables.get(i).update(deltaTime);
-        }
-
-        int physicsSize = this.physicsEntities.size;
-        for (int i = 0; physicsSize > i; i++) { // Rewritten without less-than symbol!
-            Entity entity = this.physicsEntities.get(i);
-            if (entity.getVelocity().x != 0 || entity.getVelocity().y != 0) {
-                simulatePhysicsAndCollisions(deltaTime, entity);
-            }
-        }
-        for (int i = this.physicsEntities.size - 1; i >= 0; i--) {
-            Entity entity = this.physicsEntities.get(i);
-
-            // Check if the entity is an enemy and if it died
-            if (entity instanceof Enemy) {
-                Enemy enemy = (Enemy) entity;
-                if (enemy.isDead()) {
-                    enemy.dropLoot(this); // Trigger the loot table!
-                    this.removeEntity(enemy); // Safely flag for removal
-                }
-            }
-        }
-        if (Gdx.input.isKeyJustPressed(Input.Keys.P)) {
-            if (player != null) {
-                this.spawnItemByName("health_potion", player.getPosition().x + 1f, player.getPosition().y);
-            }
-        }
-        // 3. THIRD: Track static portal interactions and key-taps
-       /* if (player != null) {
-            checkPortalOverlap(player);
-
-            if (player.getMovementIntent() != null && player.getMovementIntent().triggeredAction) {
-                tryToActivatePortal();
-            }
-        */
-        // }
-
-        int removeSize = this.entitiesToRemove.size;
-        if (removeSize > 0) {
-            for (int i = 0; removeSize > i; i++) {
-                Entity e = this.entitiesToRemove.get(i);
-                System.out.println(e.getClass().getSimpleName() + " being removed");
-                this.physicsEntities.removeValue(e, true);
-                if (e instanceof UpdateAble) {
-                    this.updateables.removeValue((UpdateAble) e, true);
-                }
-            }
-            this.entitiesToRemove.clear();
-        }
-    }
-
-    private void simulatePhysicsAndCollisions(float deltaTime, Entity entity) {
-        float safeBoundsX = entity.getBounds().x;
-        float safePosX = entity.getPosition().x;
-
-        entity.getBounds().x += entity.getVelocity().x * deltaTime;
-
-        Entity hitTargetX = checkEntityCollisions(entity);
-        if (hitTargetX != null) {
-            entity.getBounds().x = safeBoundsX;
-            entity.getPosition().x = safePosX;
-            onCollisionTriggered(new CollisionEventData(entity, hitTargetX, safePosX, entity.getPosition().y, true));
-        } else {
-            entity.getPosition().x += entity.getVelocity().x * deltaTime;
-        }
-
-        float safeBoundsY = entity.getBounds().y;
-        float safePosY = entity.getPosition().y;
-
-        entity.getBounds().y += entity.getVelocity().y * deltaTime;
-
-        Entity hitTargetY = checkEntityCollisions(entity);
-        if (hitTargetY != null) {
-            entity.getBounds().y = safeBoundsY;
-            entity.getPosition().y = safePosY;
-            onCollisionTriggered(new CollisionEventData(entity, hitTargetY, entity.getPosition().x, safePosY, false));
-        } else {
-            entity.getPosition().y += entity.getVelocity().y * deltaTime;
-        }
-    }
-
-    public Entity checkEntityCollisions(Entity movingEntity) {
-        for (Entity staticEntity : physicsEntities) {
-            if (staticEntity == movingEntity) continue;
-
-            if (movingEntity.getBounds().overlaps(staticEntity.getBounds())) {
-                return staticEntity;
-            }
-        }
-        return null;
+        return region.originalWidth;
     }
 
     private void checkPortalOverlap(Player player) {
         boolean standingOnPortal = false;
-
         for (ObjectMap.Entry<Rectangle, PortalData> entry : portals.entries()) {
             if (player.getBounds().overlaps(entry.key)) {
                 activePortalUnderPlayer = entry.value;
@@ -496,7 +422,6 @@ public class GameWorld {
                 break;
             }
         }
-
         if (!standingOnPortal) {
             activePortalUnderPlayer = null;
         }
@@ -505,89 +430,14 @@ public class GameWorld {
     public void tryToActivatePortal() {
         if (activePortalUnderPlayer != null) {
             this.pendingTransition = activePortalUnderPlayer;
-            System.out.println("Action Key Fired! Moving character into map scene: " + pendingTransition.targetMapPath);
+            System.out.println("Action Key Fired! Moving to: " + pendingTransition.targetMapPath);
         }
     }
 
-
-    private void onCollisionTriggered(CollisionEventData event) {
-        // System.out.println("💥 COLLISION! Player hit: " + event.target.getClass().getSimpleName());
-
-        event.initiator.acceptCollision(this, event);
-        event.target.acceptCollision(this, event);
-    }
-
-    public void handleSolidObstacleCollision(SolidObstacle obstacle, CollisionEventData event) {
-        if (event.isXAxis) {
-            event.initiator.getPosition().x = event.safeX;
-        } else {
-            event.initiator.getPosition().y = event.safeY;
-        }
-        event.initiator.getBounds().setPosition(event.initiator.getPosition().x, event.initiator.getPosition().y);
-    }
-
-    public void handlePlayerCollision(Player player, CollisionEventData event) {
-        if (event.isXAxis) {
-            event.initiator.getPosition().x = event.safeX;
-        } else {
-            event.initiator.getPosition().y = event.safeY;
-        }
-        System.out.println(player.toString() + " collided with: " + event.target.toString());
-    }
-
-    public void handleEnemyCollision(Enemy enemy, CollisionEventData event) {
-        if (event.isXAxis) {
-            enemy.getPosition().x = event.safeX;
-        } else {
-            enemy.getPosition().y = event.safeY;
-        }
-        enemy.getBounds().setPosition(enemy.getPosition().x, enemy.getPosition().y);
-        enemy.handleWallImpact();
-    }
-
-    public void drawTextures(SpriteBatch batch) {
-        int physicsSize = physicsEntities.size;
-        for (int i = 0; i < physicsSize; i++) {
-            Entity entity = physicsEntities.get(i);
-
-            // Skip drawing pure collision boxes
-            if (entity instanceof SolidObstacle) {
-                continue;
-            }
-
-            // Cast to your interface so the player's custom texture code fires!
-            if (entity instanceof SpriteRenderable) {
-                ((SpriteRenderable) entity).drawTextures(batch);
-            }
-        }
-    }
-
-    public void draw(ShapeRenderer shapeRenderer) {
-        shapeRenderer.setColor(com.badlogic.gdx.graphics.Color.RED);
-        for (Entity entity : physicsEntities) {
-            if (entity instanceof SolidObstacle) {
-                Rectangle bounds = entity.getBounds();
-                float w = bounds.width > 0 ? bounds.width : 32f;
-                float h = bounds.height > 0 ? bounds.height : 32f;
-                shapeRenderer.rect(bounds.x, bounds.y, w, h);
-            }
-        }
-        shapeRenderer.setColor(com.badlogic.gdx.graphics.Color.CYAN);
-        for (Rectangle portalRect : portals.keys()) {
-            float w = portalRect.width > 0 ? portalRect.width : 32f;
-            float h = portalRect.height > 0 ? portalRect.height : 32f;
-            shapeRenderer.rect(portalRect.x, portalRect.y, w, h);
-        }
-    }
-
-    public void dispose() {
-        if (map != null) map.dispose();
-    }
+    // --- SPAWN POINT ---
 
     public Vector2 findSpawnPointFromMap() {
-        // Check your object layers for a spawn point marker
         String[] layersToCheck = {"Portals", "Collisions", "SpawnPoint"};
-
         for (String layerName : layersToCheck) {
             MapLayer layer = map.getLayers().get(layerName);
             if (layer == null) continue;
@@ -598,7 +448,6 @@ public class GameWorld {
                         Rectangle rect = ((RectangleMapObject) object).getRectangle();
                         return new Vector2(rect.x * GameScreen.UNIT_SCALE, rect.y * GameScreen.UNIT_SCALE);
                     } else {
-                        // If you used a Point object instead of a Rectangle
                         float x = object.getProperties().get("x", Float.class);
                         float y = object.getProperties().get("y", Float.class);
                         return new Vector2(x * GameScreen.UNIT_SCALE, y * GameScreen.UNIT_SCALE);
@@ -607,38 +456,15 @@ public class GameWorld {
             }
         }
 
-        System.out.println("No named 'Spawn' point object found. Calculating top-left fallback position.");
-
-        // 1. Top-left of the map is X = 0, Y = map height (already scaled to meters in init())
+        System.out.println("No 'Spawn' point found. Using top-left fallback.");
         float fallbackX = 0f + FALLBACK_OFFSET_METERS;
         float fallbackY = this.mapDimensions.y - FALLBACK_OFFSET_METERS;
-
-        // 2. Guard against extreme edge offsets collapsing below 0
         if (0 > fallbackY) {
             fallbackY = this.mapDimensions.y / 2f;
         }
-
         return new Vector2(fallbackX, fallbackY);
     }
-
-    public void handleItemCollision(Item item, CollisionEventData event) {
-        if (event.initiator instanceof Player) {
-            Player player = (Player) event.initiator;
-
-            if (item instanceof ConsumableItem) {
-                ConsumableItem consumable = (ConsumableItem) item;
-                consumable.use(player);
-            }
-        } else {
-            System.out.println("Collected a regular persistent inventory/quest entity: " + item.getItemName());
-        }
-
-        item.collect();
-        this.removeEntity(item);
+    public void dispose() {
+        if (map != null) map.dispose();
     }
 }
-
-
-
-
-

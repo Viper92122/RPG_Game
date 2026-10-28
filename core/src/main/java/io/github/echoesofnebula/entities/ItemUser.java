@@ -1,9 +1,10 @@
 package io.github.echoesofnebula.entities;
 
+import io.github.echoesofnebula.items.ItemEffect;
+
 public interface ItemUser {
     void heal(int amount);
     void restoreMana(int amount);
 
-    // FIXME: Shouldn't be a String, StatusEffect class?
-    void applyStatusEffect(String status);
+    public void applyConsumableEffect(ItemEffect effect);
 }

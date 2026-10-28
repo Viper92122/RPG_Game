@@ -7,18 +7,23 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.math.Vector2;
 
 import io.github.echoesofnebula.core.GameWorld;
-import io.github.echoesofnebula.core.SpriteRenderable;
-import io.github.echoesofnebula.core.UpdateAble;
+
 import io.github.echoesofnebula.input.PlayerIntent;
 import io.github.echoesofnebula.items.Inventory;
 import io.github.echoesofnebula.events.CollisionEventData;
+import io.github.echoesofnebula.items.InventoryItem;
+import io.github.echoesofnebula.items.Item;
+import io.github.echoesofnebula.items.ItemBlueprint;
+import io.github.echoesofnebula.items.ItemEffect;
 import io.github.echoesofnebula.managers.AssetHub;
+import io.github.echoesofnebula.managers.ItemEffectFactory;
+import io.github.echoesofnebula.managers.ItemRegistry;
 import io.github.echoesofnebula.managers.ParticleSystem;
-public class Player extends Entity implements  SpriteRenderable, UpdateAble, ItemUser {
+public class Player extends Entity implements ItemUser {
     private float walkingSpeed = 5.0f;
     private float runningSpeed = 9.0f;
     private float currentSpeed = 5.0f;
-    private Inventory inventory = new Inventory();
+    private final Inventory inventory;
     private String username = "Temporary Username";
     private PlayerIntent currentIntent = new PlayerIntent();
 
@@ -48,19 +53,21 @@ public class Player extends Entity implements  SpriteRenderable, UpdateAble, Ite
         this.currentIntent.activeAction = intent.activeAction;
         this.currentIntent.actionTargetWorld.set(intent.actionTargetWorld);
     }
-    public Player(float startX, float startY, AssetHub assetHub) {
-        // Set the values on the EXISTING vectors inherited from Entity
+    public Player(float startX, float startY, AssetHub assetHub, ItemEffectFactory effectFactory) {
         this.pos.set(startX, startY);
         this.velocity.set(0, 0);
 
         float hitboxWidth = size * 0.75f;
         float hitboxHeight = size * 0.40f;
-        this.stats = new Stats(100, 50, 5.0f, 10);
-        // Update your bounds instance directly
         this.bounds.set(startX + (size - hitboxWidth) / 2f, startY, hitboxWidth, hitboxHeight);
+
+        stats = new Stats(5,5,25,25);
+        // Inventory handles all the complex item logic
+        this.inventory = new Inventory(effectFactory);
 
         initAnimations(assetHub);
     }
+
     @Override
     public void update(float deltaTime) {
         // 1. Process movement properties using the passed intent
@@ -84,12 +91,17 @@ public class Player extends Entity implements  SpriteRenderable, UpdateAble, Ite
         // 2. CRITICAL: Execute actions triggered during this single frame tick
         handlePlayerActions();
     }
+
+
+    public boolean useItem(String itemName) {
+        return inventory.useItem(itemName, this);
+    }
+
     private void handlePlayerActions() {
         if (currentIntent.activeAction == PlayerActionType.NONE) return;
 
         switch (currentIntent.activeAction) {
             case CAST_SPELL:
-                // Calculate center point of player
                 float spawnX = this.pos.x + (this.size / 2f);
                 float spawnY = this.pos.y + (this.size / 2f);
 
@@ -261,10 +273,6 @@ public class Player extends Entity implements  SpriteRenderable, UpdateAble, Ite
         System.out.println("Player restored mana! MP: " + stats.getCurrentMana() + "/" + stats.getMaxMana());
     }
 
-    @Override
-    public void applyStatusEffect(String status) {
-        System.out.println("Player affected by: " + status);
-    }
 
     public PlayerIntent getMovementIntent() {
        return this.currentIntent;
@@ -291,5 +299,15 @@ public class Player extends Entity implements  SpriteRenderable, UpdateAble, Ite
             this.isMoving, this.facingDirection, this.stateTime,
             this.currentIntent != null ? this.currentIntent.movementDirection.toString() : "NULL"
         );
+    }
+
+    @Override
+    public void pickupItem(Item item, GameWorld world) {
+        inventory.addItem(item.getBlueprint(), 1);
+    }
+
+    @Override
+    public void applyConsumableEffect(ItemEffect effect) {
+        effect.apply(this);
     }
 }
