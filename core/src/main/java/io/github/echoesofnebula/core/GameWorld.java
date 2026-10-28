@@ -1,5 +1,7 @@
 package io.github.echoesofnebula.core;
 
+import com.badlogic.gdx.Gdx;
+import com.badlogic.gdx.Input;
 import com.badlogic.gdx.graphics.g2d.Animation;
 import com.badlogic.gdx.graphics.g2d.Animation.PlayMode;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
@@ -30,6 +32,7 @@ import io.github.echoesofnebula.managers.ItemEffectRegistry;
 import io.github.echoesofnebula.items.ItemEffect;
 import io.github.echoesofnebula.items.ConsumableItem;
 import io.github.echoesofnebula.items.Item;
+import io.github.echoesofnebula.managers.ItemFactory;
 import io.github.echoesofnebula.view.GameScreen;
 import io.github.echoesofnebula.managers.AssetHub;
 
@@ -46,11 +49,32 @@ public class GameWorld {
     private PortalData pendingTransition = null;
     private PortalData activePortalUnderPlayer = null;
     private Player player;
-
+    private final ItemFactory itemFactory;
     public GameWorld(String initialMapPath, AssetHub assetHub) {
-        init(initialMapPath, assetHub);
+        itemFactory = new ItemFactory(assetHub);
+        init(initialMapPath, assetHub
+        );
     }
 
+    public void spawnItemByName(String itemName, float worldX, float worldY) {
+        System.out.println("🔍 Attempting to spawn item: '" + itemName + "' at (" + worldX + ", " + worldY + ")");
+
+        Item item = itemFactory.createItem(itemName, worldX, worldY);
+
+        if (item == null) {
+            System.err.println("❌ ERROR: ItemFactory returned null for '" + itemName + "'!");
+            return;
+        }
+
+        System.out.println("✅ Item created: " + item.getItemName());
+        System.out.println("   Position: (" + item.getPosition().x + ", " + item.getPosition().y + ")");
+        System.out.println("   Bounds: (" + item.getBounds().x + ", " + item.getBounds().y +
+            ", " + item.getBounds().width + ", " + item.getBounds().height + ")");
+
+        this.addDynamicEntity(item);
+
+        System.out.println("✨ Successfully added to world. Total entities: " + physicsEntities.size);
+    }
     private void init(String initialMapPath, AssetHub assetHub) {
         updateables = new Array<>();
         physicsEntities = new Array<>();
@@ -366,7 +390,11 @@ public class GameWorld {
                 simulatePhysicsAndCollisions(deltaTime, entity);
             }
         }
-
+        if (Gdx.input.isKeyJustPressed(Input.Keys.P)) {
+            if (player != null) {
+                this.spawnItemByName("health_potion", player.getPosition().x + 1f, player.getPosition().y);
+            }
+        }
         // 3. THIRD: Track static portal interactions and key-taps
        /* if (player != null) {
             checkPortalOverlap(player);
