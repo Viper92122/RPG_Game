@@ -12,8 +12,8 @@ public class ManaEffect implements ItemEffect {
     }
 
     @Override
-    public String getEffectType() {
-        return "MANA";
+    public EffectType getEffectType() {
+        return EffectType.MANA;
     }
 
     @Override

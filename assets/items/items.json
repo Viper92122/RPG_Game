@@ -1,4 +1,26 @@
 {
+  "berserkerFlask": {
+    "displayName": "Berserker Flask",
+    "atlasKey": "berserkerFlask",
+    "effectType": "APPLY_STATUS",
+    "statusKeys": ["slow", "strength_buff"],
+    "intensity": 1,
+    "renderWidth": 16,
+    "renderHeight": 16,
+    "isAnimated": false,
+    "isConsumable": true
+  },
+  "flaskOfFlames": {
+    "displayName": "Flask of Flames",
+    "atlasKey": "flaskOfFlames",
+    "effectType": "APPLY_STATUS",
+    "statusKey": "burn",
+    "intensity": 1,
+    "renderWidth": 16,
+    "renderHeight": 16,
+    "isAnimated": false,
+    "isConsumable": true
+  },
   "healthPotion": {
     "displayName": "Health Potion",
     "atlasKey": "healthPotion",
@@ -6,49 +28,7 @@
     "intensity": 50,
     "renderWidth": 12,
     "renderHeight": 12,
-    "frameWidth": 24,
-    "frameHeight": 39,
-    "frameDuration": 0.1,
     "isAnimated": true,
     "isConsumable": true
-  },
-  "manaPotion": {
-    "displayName": "Mana Potion",
-    "atlasKey": "manaPotion",
-    "effectType": "MANA",
-    "intensity": 30,
-    "renderWidth": 12,
-    "renderHeight": 12,
-    "frameWidth": 24,
-    "frameHeight": 39,
-    "frameDuration": 0.1,
-    "isAnimated": true,
-    "isConsumable": true
-  },
-  "dungeonKey": {
-    "displayName": "Dungeon Key",
-    "atlasKey": "dungeonKey",
-    "effectType": "NONE",
-    "intensity": 0,
-    "renderWidth": 16,
-    "renderHeight": 16,
-    "frameWidth": 0,
-    "frameHeight": 0,
-    "frameDuration": 0,
-    "isAnimated": false,
-    "isConsumable": false
-  },
-  "goldCoin": {
-    "displayName": "Gold Coin",
-    "atlasKey": "goldCoin",
-    "effectType": "NONE",
-    "intensity": 1,
-    "renderWidth": 12,
-    "renderHeight": 12,
-    "frameWidth": 0,
-    "frameHeight": 0,
-    "frameDuration": 0,
-    "isAnimated": false,
-    "isConsumable": false
   }
 }

@@ -14,6 +14,7 @@ import com.badlogic.gdx.maps.tiled.TmxMapLoader;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.ObjectMap;
 
+import io.github.echoesofnebula.entities.CharacterAnimationSet;
 import io.github.echoesofnebula.items.ItemBlueprint;
 
 public class AssetHub {
@@ -108,24 +109,12 @@ public class AssetHub {
 
     public BitmapFont getFont(String name) { return fonts.get(name); }
 
-    /**
-     * Gets a ready-to-use Animation from the atlas.
-     * Automatically detects if it's a horizontal strip or indexed frames.
-     *
-     * @param atlasKey The name of the region in the atlas
-     * @param frameDuration Seconds per frame (e.g., 0.1f)
-     * @return A complete Animation, or null if the asset isn't an animation
-     */
     public Animation<TextureRegion> getAnimation(String atlasKey, float frameDuration) {
         Array<TextureRegion> frames = getAnimationFrames(atlasKey);
         if (frames == null || frames.size == 0) return null;
         return new Animation<>(frameDuration, frames, Animation.PlayMode.LOOP);
     }
 
-    /**
-     * Gets sliced animation frames from the atlas.
-     * Handles both horizontal sprite strips AND multi-region indexed animations.
-     */
     public Array<TextureRegion> getAnimationFrames(String atlasKey) {
         TextureAtlas.AtlasRegion primaryRegion = getRegion(atlasKey);
         if (primaryRegion == null) return null;
@@ -167,9 +156,6 @@ public class AssetHub {
         return frames;
     }
 
-    /**
-     * Gets animation frames with explicit frame dimensions (for non-square frames).
-     */
     public Array<TextureRegion> getAnimationFrames(String atlasKey, int frameWidth, int frameHeight) {
         TextureAtlas.AtlasRegion primaryRegion = getRegion(atlasKey);
         if (primaryRegion == null) return null;
@@ -189,5 +175,60 @@ public class AssetHub {
         }
 
         return frames;
+    }
+
+    public CharacterAnimationSet loadCharacterAnimations(String atlasKey, float frameDuration) {
+        TextureRegion masterSheet = getRegion(atlasKey);
+        if (masterSheet == null) {
+            System.err.println("❌ ERROR: Could not find character sprite sheet: " + atlasKey);
+            return null;
+        }
+
+        int totalRows = 5;
+        int totalCols = 4;
+
+        int frameWidth = Math.max(1, masterSheet.getRegionWidth() / totalCols);
+        int frameHeight = Math.max(1, masterSheet.getRegionHeight() / totalRows);
+
+        TextureRegion[][] tmp = masterSheet.split(frameWidth, frameHeight);
+
+        Animation<TextureRegion> walkDown = createAnimation(tmp[0], totalCols, frameDuration);
+
+        Animation<TextureRegion> sideDownRight = createAnimation(tmp[1], totalCols, frameDuration);
+        Animation<TextureRegion> sideDownLeft = createFlippedAnimation(tmp[1], totalCols, frameDuration);
+
+        Animation<TextureRegion> right = createAnimation(tmp[2], totalCols, frameDuration);
+        Animation<TextureRegion> left = createFlippedAnimation(tmp[2], totalCols, frameDuration);
+
+        Animation<TextureRegion> sideUpRight = createAnimation(tmp[3], totalCols, frameDuration);
+        Animation<TextureRegion> sideUpLeft = createFlippedAnimation(tmp[3], totalCols, frameDuration);
+
+        Animation<TextureRegion> walkUp = createAnimation(tmp[4], totalCols, frameDuration);
+
+        return new CharacterAnimationSet(
+            walkDown, sideDownRight, sideDownLeft,
+            right, left, sideUpRight, sideUpLeft, walkUp
+        );
+    }
+
+
+    private Animation<TextureRegion> createAnimation(TextureRegion[] rowFrames, int count, float duration) {
+        // ✅ The 'TextureRegion.class' argument ensures the backing array is TextureRegion[], not Object[]
+        Array<TextureRegion> frames = new Array<>(TextureRegion.class);
+        for (int i = 0; i < count; i++) {
+            frames.add(rowFrames[i]);
+        }
+        return new Animation<>(duration, frames, Animation.PlayMode.LOOP);
+    }
+
+    private Animation<TextureRegion> createFlippedAnimation(TextureRegion[] rowFrames, int count, float duration) {
+        Array<TextureRegion> frames = new Array<>(TextureRegion.class);
+        for (int i = 0; i < count; i++) {
+            // Create a copy of the frame and flip it horizontally
+            TextureRegion frame = new TextureRegion(rowFrames[i]);
+            frame.flip(true, false);
+            frames.add(frame);
+        }
+        return new Animation<>(duration, frames, Animation.PlayMode.LOOP);
     }
 }

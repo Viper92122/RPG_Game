@@ -12,8 +12,8 @@ public class BuffEffect implements ItemEffect {
     }
 
     @Override
-    public String getEffectType() {
-        return "BUFF";
+    public EffectType getEffectType() {
+        return EffectType.BUFF;
     }
 
     @Override

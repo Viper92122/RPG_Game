@@ -1,0 +1,38 @@
+{
+  "burn": {
+    "displayName": "Burning",
+    "effectType": "BURN",
+    "damagePerSecond": 5,
+    "duration": 3.0,
+    "particleEffect": "fire",
+    "stackable": false,
+    "refreshDuration": true,
+    "speedModifier": 0,
+    "defenseModifier": 0,
+    "strengthModifier": 0
+  },
+  "slow": {
+    "displayName": "Slowed",
+    "effectType": "SLOW",
+    "damagePerSecond": 0,
+    "duration": 4.0,
+    "particleEffect": "ice_shards",
+    "stackable": false,
+    "refreshDuration": true,
+    "speedModifier": -0.5,
+    "defenseModifier": 0,
+    "strengthModifier": 0
+  },
+  "strength_buff": {
+    "displayName": "Empowered",
+    "effectType": "STRENGTH_BUFF",
+    "damagePerSecond": 0,
+    "duration": 10.0,
+    "particleEffect": "golden_aura",
+    "stackable": false,
+    "refreshDuration": true,
+    "speedModifier": 0,
+    "defenseModifier": 0,
+    "strengthModifier": 10
+  }
+}

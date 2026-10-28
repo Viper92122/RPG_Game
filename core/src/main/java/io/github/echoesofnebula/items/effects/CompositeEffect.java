@@ -18,8 +18,8 @@ public class CompositeEffect implements ItemEffect {
 
 
     @Override
-    public String getEffectType() {
-        return "";
+    public EffectType getEffectType() {
+        return EffectType.MULTIPLE;
     }
 
     @Override

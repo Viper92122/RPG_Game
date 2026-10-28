@@ -10,8 +10,8 @@ public class NoOpEffect implements ItemEffect {
     }
 
     @Override
-    public String getEffectType() {
-        return "NONE";
+    public EffectType getEffectType() {
+        return EffectType.NONE;
     }
 
     @Override

@@ -1,10 +1,13 @@
 package io.github.echoesofnebula.entities;
 
-import io.github.echoesofnebula.items.ItemEffect;
+import io.github.echoesofnebula.status.StatusEffect;
 
 public interface ItemUser {
     void heal(int amount);
     void restoreMana(int amount);
+    void takeDamage(int amount);
 
-    public void applyConsumableEffect(ItemEffect effect);
+    void applyStatusEffect(StatusEffect effect);
+
+    void clearStatusEffects();
 }

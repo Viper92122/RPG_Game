@@ -37,6 +37,7 @@ import io.github.echoesofnebula.managers.ItemEffectFactory;
 import io.github.echoesofnebula.managers.ItemRegistry;
 import io.github.echoesofnebula.managers.ParticleSystem;
 import io.github.echoesofnebula.managers.SpellRegistry;
+import io.github.echoesofnebula.managers.StatusEffectRegistry;
 import io.github.echoesofnebula.managers.WorldCache;
 
 public class GameScreen implements Screen {
@@ -74,6 +75,8 @@ public class GameScreen implements Screen {
         ItemRegistry items = new ItemRegistry(); // ✅ NEW
         items.initialize();
         ItemEffectFactory effects = new ItemEffectFactory(); // ✅ NEW
+        StatusEffectRegistry statusEffects = new StatusEffectRegistry(); // ✅ NEW
+        statusEffects.initialize();
         this.context = new GameContext(dialogs, spells, items, effects);
 
         this.worldCache = new WorldCache(assetHub);

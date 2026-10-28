@@ -14,8 +14,8 @@ public class HealEffect implements ItemEffect {
     }
 
     @Override
-    public String getEffectType() {
-        return "HEAL";
+    public EffectType getEffectType() {
+        return EffectType.HEAL;
     }
 
     @Override
