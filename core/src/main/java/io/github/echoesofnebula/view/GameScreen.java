@@ -24,21 +24,22 @@ import com.badlogic.gdx.utils.viewport.ScreenViewport;
 import io.github.echoesofnebula.core.GameContext;
 import io.github.echoesofnebula.core.GameWorld;
 import io.github.echoesofnebula.core.PortalData;
-import io.github.echoesofnebula.entities.Enemy;
+import io.github.echoesofnebula.entities.enemies.Enemy;
 import io.github.echoesofnebula.entities.Entity;
 import io.github.echoesofnebula.entities.Player;
 import io.github.echoesofnebula.input.PlayerController;
 import io.github.echoesofnebula.input.PlayerInputProcessor;
 import io.github.echoesofnebula.input.PlayerIntent;
-import io.github.echoesofnebula.managers.AssetHub;
-import io.github.echoesofnebula.managers.CameraManager;
-import io.github.echoesofnebula.managers.DialogRegistry;
-import io.github.echoesofnebula.managers.ItemEffectFactory;
-import io.github.echoesofnebula.managers.ItemRegistry;
-import io.github.echoesofnebula.managers.ParticleSystem;
-import io.github.echoesofnebula.managers.SpellRegistry;
-import io.github.echoesofnebula.managers.StatusEffectRegistry;
-import io.github.echoesofnebula.managers.WorldCache;
+import io.github.echoesofnebula.rendering.AssetHub;
+import io.github.echoesofnebula.rendering.CameraManager;
+import io.github.echoesofnebula.dialog.DialogRegistry;
+import io.github.echoesofnebula.items.effects.ItemEffectFactory;
+import io.github.echoesofnebula.items.ItemRegistry;
+import io.github.echoesofnebula.rendering.ParticleSystem;
+import io.github.echoesofnebula.rendering.CustomTiledMapRenderer;
+import io.github.echoesofnebula.abilities.spells.SpellRegistry;
+import io.github.echoesofnebula.items.effects.StatusEffectRegistry;
+import io.github.echoesofnebula.world.WorldCache;
 
 public class GameScreen implements Screen {
     private final Game game;
@@ -83,6 +84,7 @@ public class GameScreen implements Screen {
         GameWorld world = worldCache.getOrCreateWorld("tilemap_first.tmx", context.getItems(), context.getEffectFactory());
         Vector2 spawnPoint = world.findSpawnPointFromMap();
         world.spawnPlayer(assetHub, spawnPoint.x, spawnPoint.y, effects);
+        world.spawnTestEnemies();
 
         context.setWorld(world);
         context.setPlayer(world.getPlayer());
@@ -94,8 +96,6 @@ public class GameScreen implements Screen {
         this.cameraManager = new CameraManager(this.camera);
         ParticleSystem.initialize(GameScreen.UNIT_SCALE);
 
-        world.spawnTestEnemy(spawnPoint.x + 3f, spawnPoint.y);
-        world.spawnTestEnemy(spawnPoint.x - 2f, spawnPoint.y + 2f);
     }
 
     @Override

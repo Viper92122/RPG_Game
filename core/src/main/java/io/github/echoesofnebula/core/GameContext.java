@@ -1,10 +1,10 @@
 package io.github.echoesofnebula.core;
 
 import io.github.echoesofnebula.entities.Player;
-import io.github.echoesofnebula.managers.ItemEffectFactory;
-import io.github.echoesofnebula.managers.DialogRegistry;
-import io.github.echoesofnebula.managers.ItemRegistry;
-import io.github.echoesofnebula.managers.SpellRegistry;
+import io.github.echoesofnebula.items.effects.ItemEffectFactory;
+import io.github.echoesofnebula.dialog.DialogRegistry;
+import io.github.echoesofnebula.items.ItemRegistry;
+import io.github.echoesofnebula.abilities.spells.SpellRegistry;
 
 /**
  * The Single Source of Truth for the active game session.

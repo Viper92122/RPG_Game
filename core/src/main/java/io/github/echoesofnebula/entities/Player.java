@@ -3,16 +3,15 @@ package io.github.echoesofnebula.entities;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
-import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.utils.Array;
 
 import io.github.echoesofnebula.core.GameWorld;
 import io.github.echoesofnebula.input.PlayerIntent;
-import io.github.echoesofnebula.items.Inventory;
+import io.github.echoesofnebula.items.inventory.Inventory;
 import io.github.echoesofnebula.items.Item;
-import io.github.echoesofnebula.items.ItemEffect;
-import io.github.echoesofnebula.managers.AssetHub;
-import io.github.echoesofnebula.managers.ItemEffectFactory;
+import io.github.echoesofnebula.items.effects.ItemEffect;
+import io.github.echoesofnebula.rendering.AssetHub;
+import io.github.echoesofnebula.items.effects.ItemEffectFactory;
 import io.github.echoesofnebula.events.CollisionEventData;
 import io.github.echoesofnebula.status.StatusEffect;
 
@@ -21,15 +20,11 @@ public class Player extends Entity implements ItemUser {
     private EntityFacingDirection facingDirection = EntityFacingDirection.DOWN;
     private float stateTime = 0f;
     private boolean isMoving = false;
-
     private final Array<StatusEffect> activeStatusEffects = new Array<>();
-
-    private float walkingSpeed = 5.0f;
-    private float runningSpeed = 9.0f;
-    private float currentSpeed = 5.0f;
-
+    private CharacterStats characterStats;
     private final Inventory inventory;
     private PlayerIntent currentIntent = new PlayerIntent();
+    private float currentSpeed;
 
     public Player(float startX, float startY, AssetHub assetHub, ItemEffectFactory effectFactory) {
         this.pos.set(startX, startY);
@@ -39,11 +34,9 @@ public class Player extends Entity implements ItemUser {
         float hitboxHeight = size * 0.40f;
         this.bounds.set(startX + (size - hitboxWidth) / 2f, startY, hitboxWidth, hitboxHeight);
 
-        // ✅ Animation initialization delegated entirely to AssetHub!
+        this.characterStats = new CharacterStats(100, 100,5f, 10f, 20 );
+
         this.animations = assetHub.loadCharacterAnimations("walking_animations", 0.1f);
-        if (this.animations == null) {
-            System.err.println("🚨 CRITICAL: Failed to load player animations!");
-        }
 
         this.inventory = new Inventory(effectFactory);
     }
@@ -59,7 +52,7 @@ public class Player extends Entity implements ItemUser {
 
     @Override
     public void update(float deltaTime) {
-        currentSpeed = currentIntent.wantsToRun ? runningSpeed : walkingSpeed;
+        currentSpeed = currentIntent.wantsToRun ?  characterStats.getRunningSpeed(): characterStats.getWalkingSpeed();
         isMoving = currentIntent.movementDirection.len2() > 0.001f;
 
         if (isMoving) {
@@ -88,15 +81,12 @@ public class Player extends Entity implements ItemUser {
     }
     @Override
     public void applyStatusEffect(StatusEffect effect) {
-        // Check if we already have this effect
         for (StatusEffect existing : activeStatusEffects) {
             if (existing.getBlueprint().effectType.equals(effect.getBlueprint().effectType)) {
                 if (existing.getBlueprint().stackable) {
-                    // Add as new instance
                     activeStatusEffects.add(effect);
                     effect.onApply(this);
                 } else if (existing.getBlueprint().refreshDuration) {
-                    // Refresh existing
                     existing.refresh();
                     System.out.println("🔄 Refreshed status: " + effect.getBlueprint().displayName);
                 }
@@ -125,7 +115,7 @@ public class Player extends Entity implements ItemUser {
 
         switch (currentIntent.activeAction) {
             case CAST_SPELL:
-                System.out.println("🔥 Cast Fireball in direction: " + facingDirection);
+                System.out.println("🔥 Cast current active spell in direction: " + facingDirection);
                 break;
             case MELEE_ATTACK:
                 System.out.println("⚔️ Player swung weapon toward: " + facingDirection);
@@ -187,8 +177,12 @@ public class Player extends Entity implements ItemUser {
 
     @Override
     public void restoreMana(int amount) {
-        System.out.println("Player restored mana! MP: " + amount); // Replace with actual Stats logic
+        System.out.println("Player restored mana! MP: " + amount);
+        characterStats.setCurrentMana(characterStats.getCurrentMana() + amount);
     }
 
+    @Override
+    public void takeDamage(int amount) {
 
+    }
 }

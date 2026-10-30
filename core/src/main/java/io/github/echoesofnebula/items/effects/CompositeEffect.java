@@ -3,7 +3,6 @@ package io.github.echoesofnebula.items.effects;
 import com.badlogic.gdx.utils.Array;
 
 import io.github.echoesofnebula.entities.ItemUser;
-import io.github.echoesofnebula.items.ItemEffect;
 
 public class CompositeEffect implements ItemEffect {
     private Array<ItemEffect> effects;

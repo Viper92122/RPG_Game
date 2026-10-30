@@ -2,7 +2,7 @@ package io.github.echoesofnebula.items;
 
 import com.badlogic.gdx.utils.Array;
 
-import io.github.echoesofnebula.status.effects.StatusEffectType;
+import io.github.echoesofnebula.status.StatusEffectType;
 
 public class ItemBlueprint {
     public String displayName;

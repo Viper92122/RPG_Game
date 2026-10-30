@@ -1,7 +1,5 @@
 package io.github.echoesofnebula.status;
 
-import io.github.echoesofnebula.status.effects.StatusEffectType;
-
 public class StatusEffectBlueprint {
     public String displayName;
     public StatusEffectType effectType;  // ✅ Changed from String to enum

@@ -2,10 +2,8 @@ package io.github.echoesofnebula.items.effects;
 
 import com.badlogic.gdx.utils.Array;
 import io.github.echoesofnebula.entities.ItemUser;
-import io.github.echoesofnebula.items.ItemEffect;
-import io.github.echoesofnebula.managers.StatusEffectFactory;
 import io.github.echoesofnebula.status.StatusEffect;
-import io.github.echoesofnebula.status.effects.StatusEffectType;
+import io.github.echoesofnebula.status.StatusEffectType;
 
 
 public class ApplyStatusEffect implements ItemEffect {

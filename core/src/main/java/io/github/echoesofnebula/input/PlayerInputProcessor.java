@@ -26,8 +26,6 @@ public class PlayerInputProcessor {
         }
         currentIntent.wantsToRun = Gdx.input.isKeyPressed(Keys.SHIFT_LEFT);
 
-        // --- 2. HANDLE ACTIONS & SPELLS ---
-        // Just pressed logic handles single-action activation cleanly
         if (Gdx.input.isKeyJustPressed(Keys.ENTER) || Gdx.input.isKeyJustPressed(Keys.E)) {
             currentIntent.activeAction = PlayerActionType.INTERACT;
         } else if (Gdx.input.isKeyJustPressed(Keys.NUM_1)) {
@@ -35,10 +33,6 @@ public class PlayerInputProcessor {
         } else if (Gdx.input.isKeyJustPressed(Keys.NUM_2)) {
             currentIntent.activeAction = PlayerActionType.CAST_SPELL;
         }
-
-        // --- 3. CAPTURE TARGET CONTEXT (Optional but highly useful) ---
-        // If your game requires aiming spells/weapons with the mouse
-        // You would unproject this screen coordinate to world coordinates in your controller layer
         currentIntent.actionTargetWorld.set(Gdx.input.getX(), Gdx.input.getY());
 
         return currentIntent;

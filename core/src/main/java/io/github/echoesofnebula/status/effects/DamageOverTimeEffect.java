@@ -4,6 +4,7 @@ import io.github.echoesofnebula.entities.ItemUser;
 import io.github.echoesofnebula.status.StatusEffect;
 import io.github.echoesofnebula.status.StatusEffectBlueprint;
 
+
 public class DamageOverTimeEffect implements StatusEffect {
     protected final StatusEffectBlueprint blueprint;
     protected float remainingDuration;

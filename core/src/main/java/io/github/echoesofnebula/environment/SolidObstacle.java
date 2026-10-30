@@ -16,7 +16,7 @@ public class SolidObstacle extends Entity {
 
     @Override
     public void acceptCollision(GameWorld world, CollisionEventData event) {
-        world.handleSolidObstacleCollision(this, event);
+        // world.handleSolidObstacleCollision(this, event);
     }
 
     @Override

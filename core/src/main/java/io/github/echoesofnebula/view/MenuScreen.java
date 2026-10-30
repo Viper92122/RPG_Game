@@ -16,7 +16,7 @@ import com.badlogic.gdx.scenes.scene2d.ui.TextButton;
 import com.badlogic.gdx.scenes.scene2d.utils.ClickListener;
 import com.badlogic.gdx.utils.viewport.ScreenViewport;
 
-import io.github.echoesofnebula.managers.AssetHub;
+import io.github.echoesofnebula.rendering.AssetHub;
 
 public class MenuScreen implements Screen {
     private final Game game;

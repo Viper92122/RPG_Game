@@ -1,7 +1,6 @@
 package io.github.echoesofnebula.items.effects;
 
 import io.github.echoesofnebula.entities.ItemUser;
-import io.github.echoesofnebula.items.ItemEffect;
 
 public class TemporaryBuffEffect implements ItemEffect {
     private float duration;
@@ -14,8 +13,8 @@ public class TemporaryBuffEffect implements ItemEffect {
     }
 
     @Override
-    public String getEffectType() {
-        return "";
+    public EffectType getEffectType() {
+        return EffectType.BUFF;
     }
 
     @Override

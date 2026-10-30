@@ -1,7 +1,7 @@
 package io.github.echoesofnebula;
 
 import com.badlogic.gdx.Game;
-import io.github.echoesofnebula.managers.AssetHub;
+import io.github.echoesofnebula.rendering.AssetHub;
 import io.github.echoesofnebula.view.LoadingScreen;
 
 public class App extends Game {
@@ -11,8 +11,6 @@ public class App extends Game {
     public void create() {
         assetHub = new AssetHub();
         assetHub.queueInitialAssets(); // Replace with your actual loading method
-
-
         setScreen(new LoadingScreen(this, assetHub));
     }
 

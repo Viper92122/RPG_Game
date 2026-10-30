@@ -28,8 +28,8 @@ public class Item extends Entity   {
     public Item(String itemName, float startX, float startY, float width, float height,ItemBlueprint blueprint,
                 TextureRegion texture, Animation<TextureRegion> animation) {
         this(itemName, startX, startY, width, height, blueprint);
-        this.staticTexture = texture;       // Will be null if animated
-        this.animation = animation;   // Will be null if static
+        this.staticTexture = texture;
+        this.animation = animation;
     }
 
 
@@ -47,8 +47,6 @@ public class Item extends Entity   {
         TextureRegion currentFrame = (animation != null) ? animation.getKeyFrame(stateTime, true) : staticTexture;
 
         if (currentFrame != null) {
-
-
             float bobbingY = (float) Math.sin(stateTime * 3.0f) * 0.04f;
             batch.draw(currentFrame, getPosition().x, getPosition().y + bobbingY, width, height);
         }

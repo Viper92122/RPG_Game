@@ -1,5 +1,6 @@
 package io.github.echoesofnebula.entities;
 
+import io.github.echoesofnebula.items.effects.BuffEffect;
 import io.github.echoesofnebula.status.StatusEffect;
 
 public interface ItemUser {
@@ -10,4 +11,5 @@ public interface ItemUser {
     void applyStatusEffect(StatusEffect effect);
 
     void clearStatusEffects();
+
 }

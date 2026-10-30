@@ -1,9 +1,7 @@
 package io.github.echoesofnebula.core;
 
-import com.badlogic.gdx.graphics.g2d.Animation;
 import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.g2d.TextureAtlas.AtlasRegion;
-import com.badlogic.gdx.graphics.g2d.TextureRegion;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.maps.MapLayer;
 import com.badlogic.gdx.maps.MapObject;
@@ -17,20 +15,20 @@ import com.badlogic.gdx.math.Vector2;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.ObjectMap;
 
-import io.github.echoesofnebula.entities.Enemy;
+import io.github.echoesofnebula.ai.AIController;
+import io.github.echoesofnebula.entities.enemies.Enemy;
 import io.github.echoesofnebula.entities.Entity;
 import io.github.echoesofnebula.entities.Player;
 import io.github.echoesofnebula.environment.SolidObstacle;
 import io.github.echoesofnebula.events.CollisionEventData;
-import io.github.echoesofnebula.items.ConsumableItem;
 import io.github.echoesofnebula.items.Item;
 import io.github.echoesofnebula.items.ItemFactory;
-import io.github.echoesofnebula.managers.ItemEffectFactory;
-import io.github.echoesofnebula.managers.ItemRegistry;
-import io.github.echoesofnebula.managers.MapEntityFactory;
-import io.github.echoesofnebula.managers.EnemyFactory;
+import io.github.echoesofnebula.items.effects.ItemEffectFactory;
+import io.github.echoesofnebula.items.ItemRegistry;
+import io.github.echoesofnebula.items.MapEntityFactory;
+import io.github.echoesofnebula.entities.enemies.EnemyFactory;
 import io.github.echoesofnebula.ai.AIBehavior;
-import io.github.echoesofnebula.managers.AssetHub;
+import io.github.echoesofnebula.rendering.AssetHub;
 import io.github.echoesofnebula.view.GameScreen;
 
 public class GameWorld {
@@ -71,8 +69,16 @@ public class GameWorld {
             (tileObj, atlasKey, x, y, w, h) -> {
                 return itemFactory.createItem(atlasKey, x, y);
             });
-
         loadPortalsFromMap();
+    }
+
+    public void spawnTestEnemies(){
+
+
+        for(int i = 0; i<20; i++) {
+            enemyFactory.createEnemy(
+                "orc", player.getPosition().x + 50 * i, player.getPosition().y + 20 * i);
+        }
     }
 
     public TiledMap getMap() { return map; }
@@ -111,44 +117,6 @@ public class GameWorld {
         physicsEntities.removeValue(entity, true);
         entitiesToRemove.removeValue(entity, true);
     }
-
-    // --- FACTORY-BASED SPAWNING ---
-
-    /**
-     * Spawns an enemy using the EnemyFactory.
-     * The factory handles Stats, LootTable, and Animations automatically.
-     */
-    public void spawnEnemy(String type, float x, float y, AIBehavior aiBehavior) {
-        Enemy enemy = enemyFactory.createEnemy(type, x, y, aiBehavior);
-        this.addDynamicEntity(enemy);
-        System.out.println("✨ Spawned enemy '" + type + "' at (" + x + ", " + y + ")");
-    }
-
-    /**
-     * Convenience method for quick testing (defaults to test_slime)
-     */
-    public void spawnTestEnemy(float x, float y) {
-        AIBehavior simpleAI = new AIBehavior() {
-            @Override
-            public void update(Enemy enemy, float deltaTime) {
-                if (Math.random() < 0.02f) {
-                    float randomX = (float)(Math.random() * 2 - 1);
-                    float randomY = (float)(Math.random() * 2 - 1);
-                    enemy.getVelocity().set(randomX, randomY).scl(enemy.getStats().getMoveSpeed());
-                }
-            }
-            @Override
-            public void handleWallImpact(Enemy enemy) {
-                enemy.getVelocity().scl(-1);
-            }
-        };
-        spawnEnemy("test_slime", x, y, simpleAI);
-    }
-
-    /**
-     * Spawns any item by name using the ItemFactory.
-     * Used for loot drops, chest rewards, etc.
-     */
     public void spawnItemByName(String itemName, float worldX, float worldY) {
         System.out.println("🔍 Attempting to spawn item: '" + itemName + "' at (" + worldX + ", " + worldY + ")");
 

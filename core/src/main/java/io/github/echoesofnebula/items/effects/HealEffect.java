@@ -1,7 +1,6 @@
 package io.github.echoesofnebula.items.effects;
 
 import io.github.echoesofnebula.entities.ItemUser;
-import io.github.echoesofnebula.items.ItemEffect;
 
 public class HealEffect implements ItemEffect {
     private float intensity = 10f;

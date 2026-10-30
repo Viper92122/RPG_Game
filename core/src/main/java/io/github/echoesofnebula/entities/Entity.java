@@ -7,7 +7,8 @@ import com.badlogic.gdx.math.Vector2;
 import io.github.echoesofnebula.core.GameWorld;
 import io.github.echoesofnebula.events.CollisionEventData;
 import io.github.echoesofnebula.items.Item;
-import io.github.echoesofnebula.items.ItemEffect;
+import io.github.echoesofnebula.items.effects.ItemEffect;
+import io.github.echoesofnebula.rendering.AssetHub;
 import io.github.echoesofnebula.view.GameScreen;
 
 public abstract class Entity {
@@ -16,14 +17,11 @@ public abstract class Entity {
     protected Rectangle bounds = new Rectangle();
     protected float size = 16f * GameScreen.UNIT_SCALE;
 
-    // --- DEFAULT NO-OP METHODS (This eliminates the need for instanceof!) ---
 
     public void update(float deltaTime) {
-        // Override in subclasses if the entity needs to update (e.g., Player, Enemy, Item)
     }
 
     public void drawTextures(SpriteBatch batch) {
-        // Override in subclasses if the entity has a visual texture
     }
 
     public void drawShapes(ShapeRenderer shapeRenderer) {

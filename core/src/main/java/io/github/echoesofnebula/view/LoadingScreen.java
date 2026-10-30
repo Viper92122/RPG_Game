@@ -9,7 +9,7 @@ import com.badlogic.gdx.graphics.g2d.SpriteBatch;
 import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.utils.ScreenUtils;
 
-import io.github.echoesofnebula.managers.AssetHub;
+import io.github.echoesofnebula.rendering.AssetHub;
 
 public class LoadingScreen implements Screen {
     private final Game game;
